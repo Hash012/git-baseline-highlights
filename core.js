@@ -104,11 +104,14 @@ function parseDetailedHunks(diff) {
     const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
     if (match) {
       finish();
+      const oldCount = match[2] === undefined ? 1 : Number(match[2]);
+      const newCount = match[4] === undefined ? 1 : Number(match[4]);
       current = {
-        oldStart: Number(match[1]) ? Number(match[1]) - 1 : 0,
-        oldCount: match[2] === undefined ? 1 : Number(match[2]),
-        newStart: Number(match[3]) ? Number(match[3]) - 1 : 0,
-        newCount: match[4] === undefined ? 1 : Number(match[4]),
+        // 零行侧的位置是插入/删除边界；非零行侧才是从 1 开始的行号。
+        oldStart: Number(match[1]) - (oldCount ? 1 : 0),
+        oldCount,
+        newStart: Number(match[3]) - (newCount ? 1 : 0),
+        newCount,
         oldLines: [], newLines: [],
       };
     } else if (current && line.startsWith('-')) {
@@ -124,7 +127,7 @@ function isText(buffer) {
   return Buffer.isBuffer(buffer) && buffer.length <= MAX_BYTES && !buffer.includes(0);
 }
 function linesOf(buffer) {
-  if (!Buffer.isBuffer(buffer)) return [];
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) return [];
   const lines = buffer.toString('utf8').replace(/\r\n/g, '\n').split('\n');
   if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
   return lines;
@@ -158,7 +161,7 @@ async function diffBuffers(root, before, after) {
     const beforeFile = path.join(directory, 'before');
     const afterFile = path.join(directory, 'after');
     await Promise.all([fs.writeFile(beforeFile, before, {mode: 0o600}), fs.writeFile(afterFile, after, {mode: 0o600})]);
-    const output = await git(root, ['diff', '--no-color', '--no-index', '--no-ext-diff', '--no-textconv', '--unified=0', '--', beforeFile, afterFile], [1]);
+    const output = await git(root, ['diff', '--no-color', '--no-index', '--no-ext-diff', '--no-textconv', '--unified=0', '--inter-hunk-context=0', '--', beforeFile, afterFile], [1]);
     return parseDetailedHunks(output.toString('utf8'));
   } finally { await fs.rm(directory, {recursive: true, force: true}); }
 }
@@ -171,7 +174,7 @@ async function compareBuffers(root, baseline, current, lineCount) {
       const target = edit.oldCount ? result.modified : result.added;
       for (let line = edit.newStart; line < edit.newStart + edit.newCount; line++) pushLine(target, line, lineCount);
     } else if (edit.oldCount > 0 && lineCount > 0) {
-      pushLine(result.deleted, Math.min(Math.max(edit.newStart, 0), lineCount - 1), lineCount);
+      pushLine(result.deleted, Math.min(Math.max(edit.newStart - 1, 0), lineCount - 1), lineCount);
     }
   }
   return result;
@@ -189,11 +192,18 @@ async function projectBuffers(root, start, end, target, lineCount) {
   const ac = !isText(start)
     ? [{oldStart: 0, oldCount: 0, newStart: 0, newCount: targetLines.length, oldLines: [], newLines: targetLines}]
     : await diffBuffers(root, start, target);
+  const changedTargetLines = new Set();
+  for (const edit of ac) {
+    for (let line = edit.newStart; line < edit.newStart + edit.newCount; line++) changedTargetLines.add(line);
+  }
   const markBLines = (edit, kind) => {
     const weakKind = `weak${kind[0].toUpperCase()}${kind.slice(1)}`;
     for (let index = edit.newStart; index < edit.newStart + edit.newCount; index++) {
       const mapped = mapLineThroughEdits(index, bc);
-      for (const line of mapped.lines) pushLine(mapped.changed ? result[weakKind] : result[kind], line, lineCount);
+      for (const line of mapped.lines) {
+        // B→C 替换块可能包含已恢复到 A 的行，只有仍偏离 A 的行保留弱标记。
+        if (!mapped.changed || changedTargetLines.has(line)) pushLine(mapped.changed ? result[weakKind] : result[kind], line, lineCount);
+      }
     }
   };
   for (const edit of ab) {
@@ -205,7 +215,7 @@ async function projectBuffers(root, start, end, target, lineCount) {
         return right > left;
       });
       const deletion = relevant.find(candidate => candidate.newCount === 0);
-      if (deletion) pushLine(result.deleted, Math.min(Math.max(deletion.newStart, 0), lineCount - 1), lineCount);
+      if (deletion) pushLine(result.deleted, Math.min(Math.max(deletion.newStart - 1, 0), lineCount - 1), lineCount);
       else for (const candidate of relevant) {
         for (let line = candidate.newStart; line < candidate.newStart + candidate.newCount; line++) pushLine(result.weakDeleted, line, lineCount);
       }

@@ -14,6 +14,10 @@ test('空文件边界、纯新增、替换与删除位置', () => {
   assert.deepEqual(core.parseHunks('@@ -1,2 +0,0 @@\n-x\n-y', 1), {added:[],modified:[],deleted:[0]});
   assert.deepEqual(core.parseHunks('@@ -1 +0,0 @@', 0), {added:[],modified:[],deleted:[]});
   assert.deepEqual(core.parseDetailedHunks('--- before\n+++ after\n@@ -2 +2 @@\n-old\n+new\n'), [{oldStart:1,oldCount:1,newStart:1,newCount:1,oldLines:['old'],newLines:['new']}]);
+  assert.deepEqual(core.parseDetailedHunks('@@ -1,0 +2 @@\n+insert\n@@ -3 +3,0 @@\n-deleted\n'), [
+    {oldStart:1,oldCount:0,newStart:1,newCount:1,oldLines:[],newLines:['insert']},
+    {oldStart:2,oldCount:1,newStart:3,newCount:0,oldLines:['deleted'],newLines:[]},
+  ]);
 });
 test('NUL文件状态保留空格、中文与换行路径', () => {
   assert.deepEqual([...core.parseStatuses(Buffer.from('A\0中文 空格\n.txt\0M\0[x].py\0D\0gone\0'))], [['中文 空格\n.txt','A'], ['[x].py','M'], ['gone','D']]);
@@ -86,6 +90,61 @@ test('三基线投影：保留的变更强标亮，后续演进的变更弱标�
     assert.equal(await core.isAncestor(root, a, b), true);
     assert.equal(await core.isAncestor(root, b, c), true);
   } finally { await fs.rm(root, {recursive: true, force: true}); }
+});
+
+test('投影行号在开头、中间和末尾插入或删除时保持正确', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'baseline-map-'));
+  const marks = {added:[],modified:[0,1,2],deleted:[],weakAdded:[],weakModified:[],weakDeleted:[]};
+  try {
+    const target = Buffer.from('a\nb\nc\n');
+    for (const [current, expected] of [
+      ['x\na\nb\nc\n', [1,2,3]],
+      ['a\nx\nb\nc\n', [0,2,3]],
+      ['a\nb\nc\nx\n', [0,1,2]],
+      ['b\nc\n', [0,1]],
+      ['a\nc\n', [0,1]],
+      ['a\nb\n', [0,1]],
+    ]) {
+      const actual = await core.mapProjectedMarks(root, target, Buffer.from(current), marks, 5);
+      assert.deepEqual(actual, {...marks, modified:expected}, current);
+    }
+    for (const current of ['b\nc\n', 'a\nc\n', 'a\nb\n']) {
+      assert.deepEqual(await core.compareBuffers(root, target, Buffer.from(current), 2), {added:[],modified:[],deleted:[current === 'a\nb\n' ? 1 : 0]});
+    }
+    const projected = await core.projectBuffers(root, Buffer.from('head\na\nb\n'), Buffer.from('head\nB\n'), Buffer.from('head\ninsert\nB\n'), 3);
+    assert.deepEqual(projected, {added:[],modified:[2],deleted:[],weakAdded:[],weakModified:[],weakDeleted:[]});
+  } finally { await fs.rm(root, {recursive:true,force:true}); }
+});
+
+test('三基线投影清除完整和局部回退，同时保留或弱化其他变更', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'baseline-revert-'));
+  const empty = {added:[],modified:[],deleted:[],weakAdded:[],weakModified:[],weakDeleted:[]};
+  try {
+    const start = Buffer.from('a\nb\nc\n');
+    const end = Buffer.from('A\nB\nC\n');
+    for (const [target, expected] of [
+      ['a\nb\nc\n', empty],
+      ['a\nD\nC\n', {...empty, modified:[2], weakModified:[1]}],
+      ['a\nB\nD\n', {...empty, modified:[1], weakModified:[2]}],
+    ]) {
+      assert.deepEqual(await core.projectBuffers(root, start, end, Buffer.from(target), 3), expected, target);
+    }
+    assert.deepEqual(await core.projectBuffers(root, null, Buffer.alloc(0), Buffer.alloc(0), 1), empty);
+    assert.deepEqual(await core.projectBuffers(root, null, Buffer.from('\n'), Buffer.from('\n'), 2), {...empty, added:[0]});
+    assert.deepEqual(await core.projectBuffers(root, Buffer.from('a\nb\nc\n'), Buffer.from('a\nc\n'), Buffer.from('a\nc\n'), 2), {...empty, deleted:[0]});
+  } finally { await fs.rm(root, {recursive:true,force:true}); }
+});
+
+test('diff.interHunkContext 配置不会把未改变的上下文标为修改', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'baseline-diff-config-'));
+  try {
+    run(root, ['init', '-q']);
+    run(root, ['config', 'diff.interHunkContext', '3']);
+    const start = Buffer.from('a\nb\nc\n');
+    const end = Buffer.from('A\nb\nC\n');
+    assert.deepEqual(await core.compareBuffers(root, start, end, 3), {added:[],modified:[0,2],deleted:[]});
+    assert.deepEqual(await core.projectBuffers(root, start, end, end, 3), {added:[],modified:[0,2],deleted:[],weakAdded:[],weakModified:[],weakDeleted:[]});
+  } finally { await fs.rm(root, {recursive:true,force:true}); }
 });
 
 test('仓库子目录与worktree探测；分支解析得到固定提交', async () => {
