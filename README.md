@@ -30,8 +30,11 @@ This repository distributes source and a VSIX package. It is not a listing in th
 | **Git Baseline Highlights: Toggle Highlights** | Show or hide the decorations. |
 | **Git Baseline Highlights: Refresh Highlights** | Recalculate file and line changes. |
 | **Git Baseline Highlights: Show Legend** | Explain the colors and limits. |
+| **Git Baseline Highlights: Set Base for All Repositories** | Pin one baseline in every discovered repository. |
 
-The status bar shows the selected baseline. Hover over decorations for their meaning. When several Git repositories are open, highlighting follows the active editor's repository; it does not decorate every repository simultaneously.
+The status bar shows the selected baseline. Hover over decorations for their meaning. When several Git repositories are open, each discovered repository keeps its own baseline and visible editors are decorated according to their repository; the status bar follows the active editor.
+
+The Git Baseline Highlights view lists discovered repositories and their changed files. Select a repository in the view to choose its baseline, or use the title command to set one baseline in every repository. Nested repositories are discovered up to three directory levels by default; configure `gitBaselineHighlights.scanDepth` to change that.
 
 Changes to visible, unsaved text are compared after a short debounce. Saves, file operations, window focus and Git metadata changes refresh file badges. Manual refresh is available when an external change does not emit an event.
 
@@ -45,7 +48,7 @@ These optional settings default to `false`. Enabling them may overlap Git or oth
 
 - `gitBaselineHighlights.showGutterIcons`: colored gutter diamonds.
 - `gitBaselineHighlights.showOverviewRuler`: overview ruler marks.
-- `gitBaselineHighlights.showFileBadges`: Explorer N/M badges and colors.
+- `gitBaselineHighlights.showFileBadges`: Explorer A/M/D/R badges and changed-folder markers.
 
 Settings take effect automatically without reloading. Keep the defaults for the coexistence layout.
 
@@ -55,12 +58,15 @@ Defaults work without adding a project configuration file. If needed, set these 
 
 - `gitBaselineHighlights.repository`: optional repository directory; leave empty for automatic detection.
 - `gitBaselineHighlights.base`: optional baseline override; leave empty to use the per-repository selection.
+- `gitBaselineHighlights.comparisonMode`: `direct` compares to the selected commit; `mergeBase` compares to the common ancestor of the selected ref and `HEAD`, which is useful for PR-style review.
+- `gitBaselineHighlights.followBase`: re-resolve a configured branch or tag on every refresh; disabled by default to preserve fixed-commit semantics.
+- `gitBaselineHighlights.scanDepth`: nested Git repository discovery depth, defaulting to 3.
 
-Changing the configured baseline expression resolves and saves it once. It stays fixed across refreshes. A later command selection replaces the saved baseline without changing settings; changing the configuration expression again resolves a new baseline.
+Changing the configured baseline expression resolves and saves it once. It stays fixed across refreshes unless `followBase` is enabled. A later command selection replaces the saved baseline without changing settings; changing the configuration expression again resolves a new baseline.
 
 ## What stays unchanged
 
-The extension reads Git data and draws editor decorations. It does not write source files, stage changes, switch branches, create commits, alter Git configuration or write workspace settings. Selections and toggles use VS Code's extension workspace storage.
+The extension reads Git data and draws editor decorations. It does not write source files, stage changes, switch branches, create commits, alter Git configuration or write workspace settings. Selections and toggles use VS Code's extension workspace storage. Each discovered repository stores its baseline independently.
 
 Temporary text comparisons use the operating system's temporary directory and are removed after comparison. An abruptly terminated process can leave a temporary directory behind.
 
@@ -69,7 +75,7 @@ Temporary text comparisons use the operating system's temporary directory and ar
 - Ignored files do not become new-file highlights merely because they are opened. Tracked files remain eligible even if an ignore rule matches them.
 - NUL-containing binary data, files over 2 MiB and documents over 100,000 lines skip line highlighting.
 - Replacement blocks are orange as a whole; this is line-level highlighting, not character-level attribution.
-- Renames appear as deletion of the old path and addition of the new path.
+- Renames appear as an R status in the changes view; the old path is retained as a deleted status for decoration purposes.
 - Deleted text is represented by an anchor on a neighboring current line, not recreated in the document.
 - Special encodings or line-ending conversions can appear as broad replacement blocks.
 - Optional Explorer badges can interact with other decoration providers; the Git Source Control view remains available.

@@ -26,19 +26,54 @@ function relativeInside(root, file) {
     ? relative.split(path.sep).join('/') : null;
 }
 function parseStatuses(buffer) {
-  const parts = buffer.toString('utf8').split('\0');
   const result = new Map();
-  for (let i = 0; i + 1 < parts.length; i += 2) {
-    if (parts[i] && parts[i + 1]) result.set(parts[i + 1], parts[i][0]);
+  for (const change of parseChanges(buffer)) {
+    if (change.status === 'R' || change.status === 'C') {
+      result.set(change.oldPath, 'D');
+      result.set(change.path, change.status);
+    } else {
+      result.set(change.path, change.status);
+    }
+  }
+  return result;
+}
+function parseChanges(buffer) {
+  const parts = buffer.toString('utf8').split('\0');
+  const result = [];
+  for (let i = 0; i + 1 < parts.length;) {
+    const status = parts[i];
+    if (!status) { i += 1; continue; }
+    const code = status[0];
+    if ((code === 'R' || code === 'C') && i + 2 < parts.length && parts[i + 1] && parts[i + 2]) {
+      result.push({status: code, score: Number(status.slice(1)) || 0, oldPath: parts[i + 1], path: parts[i + 2]});
+      i += 3;
+    } else if (parts[i + 1]) {
+      result.push({status: code, path: parts[i + 1]});
+      i += 2;
+    } else {
+      i += 1;
+    }
   }
   return result;
 }
 async function scan(root, base) {
   const commit = (await git(root, ['rev-parse', '--verify', '--end-of-options', `${base}^{commit}`])).toString().trim();
-  const statuses = parseStatuses(await git(root, ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--name-status', '-z', '--no-renames', commit, '--']));
+  const changes = parseChanges(await git(root, ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--name-status', '-z', '--find-renames', commit, '--']));
+  const statuses = new Map();
+  for (const change of changes) {
+    if (change.status === 'R' || change.status === 'C') {
+      statuses.set(change.oldPath, 'D');
+      statuses.set(change.path, change.status);
+    } else {
+      statuses.set(change.path, change.status);
+    }
+  }
   const others = (await git(root, ['ls-files', '--others', '--exclude-standard', '-z'])).toString('utf8').split('\0');
-  for (const file of others) if (file) statuses.set(file, 'A');
-  return {commit, statuses};
+  for (const file of others) if (file) {
+    statuses.set(file, 'A');
+    changes.push({status: 'A', path: file});
+  }
+  return {commit, statuses, changes};
 }
 function parseHunks(diff, lineCount) {
   const result = {added: [], modified: [], deleted: []};
@@ -81,6 +116,11 @@ async function readBaseline(root, commit, file) {
 async function resolveCommit(root, reference) {
   return (await git(root, ['rev-parse', '--verify', '--end-of-options', `${reference}^{commit}`])).toString().trim();
 }
+async function resolveBaseline(root, reference, mode = 'direct') {
+  const commit = await resolveCommit(root, reference);
+  if (mode !== 'mergeBase') return commit;
+  return (await git(root, ['merge-base', commit, 'HEAD'])).toString().trim();
+}
 async function discover(directory) {
   try {
     const root = await fs.realpath(path.resolve((await git(directory, ['rev-parse', '--show-toplevel'])).toString().replace(/\r?\n$/, '')));
@@ -91,6 +131,35 @@ async function discover(directory) {
     if (error.code === 128 || error.code === 'ENOENT') return null;
     throw error;
   }
+}
+async function discoverAll(directories, depth = 3) {
+  const roots = Array.isArray(directories) ? directories : [directories];
+  const queue = roots.filter(Boolean).map(directory => ({directory: path.resolve(directory), level: 0}));
+  const seenDirectories = new Set();
+  const repositories = new Map();
+  while (queue.length) {
+    const current = queue.shift();
+    if (seenDirectories.has(current.directory) || current.level > depth) continue;
+    seenDirectories.add(current.directory);
+    let gitMarker = current.level === 0;
+    if (!gitMarker) {
+      try { await fs.lstat(path.join(current.directory, '.git')); gitMarker = true; }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+    if (gitMarker) {
+      const repository = await discover(current.directory);
+      if (repository) repositories.set(repository.root, repository);
+    }
+    if (current.level === depth) continue;
+    let entries;
+    try { entries = await fs.readdir(current.directory, {withFileTypes: true}); }
+    catch (error) { if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error; continue; }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name === '.git' || entry.name === 'node_modules') continue;
+      queue.push({directory: path.join(current.directory, entry.name), level: current.level + 1});
+    }
+  }
+  return [...repositories.values()];
 }
 async function relativeFile(root, file) {
   const direct = relativeInside(root, file);
@@ -103,4 +172,4 @@ async function relativeFile(root, file) {
     catch { return null; }
   }
 }
-module.exports = {MAX_BYTES, git, relativeInside, parseStatuses, scan, parseHunks, isText, compareBuffers, readBaseline, resolveCommit, discover, relativeFile};
+module.exports = {MAX_BYTES, git, relativeInside, parseStatuses, parseChanges, scan, parseHunks, isText, compareBuffers, readBaseline, resolveCommit, resolveBaseline, discover, discoverAll, relativeFile};

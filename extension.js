@@ -5,6 +5,7 @@ const path = require('node:path');
 const core = require('./core');
 function activate(context) {
   const emitter = new vscode.EventEmitter();
+  const treeEmitter = new vscode.EventEmitter();
   const output = vscode.window.createOutputChannel('Git Baseline Highlights');
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 20);
   status.command = 'gitBaselineHighlights.selectBaseline';
@@ -45,6 +46,7 @@ function activate(context) {
     emitter.fire(undefined);
   }
   let enabled = context.workspaceState.get('enabled', true);
+  let repositoryStates = new Map();
   let root = '';
   let base = '';
   let configuredBase = '';
@@ -52,6 +54,8 @@ function activate(context) {
   let watchers = [];
   let commit = '';
   let statuses = new Map();
+  let changes = [];
+  let folderChanges = new Set();
   const liveStatuses = new Map();
   let scanEpoch = 0;
   let editEpoch = 0;
@@ -83,66 +87,160 @@ function activate(context) {
     const override = config.get('repository', '').trim();
     const directory = override ? path.resolve(folder.uri.fsPath, override)
       : active && active.document.uri.scheme === 'file' ? path.dirname(active.document.uri.fsPath) : folder.uri.fsPath;
-    return {repository: await core.discover(directory), expression: config.get('base', '').trim()};
+    const configuredMode = config.get('comparisonMode', 'direct');
+    return {
+      repository: await core.discover(directory),
+      expression: config.get('base', '').trim(),
+      mode: configuredMode === 'mergeBase' ? 'mergeBase' : 'direct',
+      followBase: config.get('followBase', false) === true,
+    };
   }
-  function bindWatchers(repository) {
-    const identity = repository ? `${repository.root}\0${repository.gitDir}\0${repository.commonDir}` : '';
+  async function configureRepositories() {
+    const single = await configure();
+    if (!single) return null;
+    const folders = (vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file');
+    const active = vscode.window.activeTextEditor;
+    const folder = active && active.document.uri.scheme === 'file'
+      ? vscode.workspace.getWorkspaceFolder(active.document.uri) : folders[0];
+    const config = folder ? vscode.workspace.getConfiguration('gitBaselineHighlights', folder.uri) : null;
+    const depth = Math.max(0, Math.min(8, Number(config && config.get('scanDepth', 3)) || 3));
+    const override = config && config.get('repository', '').trim();
+    const directories = override && folder
+      ? [path.resolve(folder.uri.fsPath, override)]
+      : folders.map(item => item.uri.fsPath);
+    let repositories = core.discoverAll ? await core.discoverAll(
+      directories, depth,
+    ) : [];
+    // Keep the active-repository fallback for older workspaces and test hosts that do not expose recursive discovery.
+    if (!repositories.length && single.repository) repositories = [single.repository];
+    return {repositories, expression: single.expression, mode: single.mode, followBase: single.followBase};
+  }
+  function bindWatchers(repositories) {
+    const list = Array.isArray(repositories) ? repositories : repositories ? [repositories] : [];
+    const identity = list.map(repository => `${repository.root}\0${repository.gitDir}\0${repository.commonDir}`).sort().join('\0');
     if (watcherRoot === identity) return;
     for (const watcher of watchers) watcher.dispose();
     watchers = []; watcherRoot = identity;
-    if (!repository) return;
-    for (const directory of new Set([repository.gitDir, repository.commonDir])) {
+    for (const directory of new Set(list.flatMap(repository => [repository.gitDir, repository.commonDir]))) {
       const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(directory, '{HEAD,index,refs/**,packed-refs}'));
       watchers.push(watcher, watcher.onDidChange(scheduleScan), watcher.onDidCreate(scheduleScan), watcher.onDidDelete(scheduleScan));
     }
   }
-  async function baselineFor(repositoryRoot, expression, ticket) {
+  async function baselineFor(repositoryRoot, expression, ticket, mode = 'direct', followBase = false) {
     const key = `baseline:${repositoryRoot}`;
     let saved = context.workspaceState.get(key);
     // 配置表达式改变时解析一次并冻结；后续刷新不会跟随分支移动。
     if (saved && !expression && saved.configuration !== '') {
       saved = {...saved, configuration: ''};
-      await persistBaseline(repositoryRoot, saved, () => !disposed && ticket === scanEpoch && root === repositoryRoot);
+      await persistBaseline(repositoryRoot, saved, () => !disposed && ticket === scanEpoch);
     }
-    if (expression && (!saved || saved.configuration !== expression)) {
-      saved = {commit: await core.resolveCommit(repositoryRoot, expression), reference: expression, configuration: expression};
-      if (disposed || ticket !== scanEpoch || root !== repositoryRoot) return null;
-      await persistBaseline(repositoryRoot, saved, () => !disposed && ticket === scanEpoch && root === repositoryRoot);
+    if (expression && (!saved || saved.configuration !== expression || saved.mode !== mode || followBase)) {
+      const commit = mode === 'mergeBase' && core.resolveBaseline
+        ? await core.resolveBaseline(repositoryRoot, expression, mode)
+        : await core.resolveCommit(repositoryRoot, expression);
+      saved = {commit, reference: expression, configuration: expression, mode};
+      if (disposed || ticket !== scanEpoch) return null;
+      await persistBaseline(repositoryRoot, saved, () => !disposed && ticket === scanEpoch);
     }
     return saved || null;
   }
-  async function selectBaseline() {
+  function contains(rootDirectory, file) {
+    const relative = path.relative(rootDirectory, file);
+    return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  }
+  function stateForPath(file) {
+    const candidates = [...repositoryStates.values()]
+      .filter(state => state.root && contains(state.root, file))
+      .sort((left, right) => right.root.length - left.root.length);
+    return candidates[0] || null;
+  }
+  function rebuildFolderChanges(state) {
+    state.folderChanges = new Set();
+    for (const file of state.statuses.keys()) {
+      let directory = path.posix.dirname(file);
+      while (directory && directory !== '.') {
+        state.folderChanges.add(directory);
+        directory = path.posix.dirname(directory);
+      }
+    }
+  }
+  function selectActiveState() {
+    const active = vscode.window.activeTextEditor;
+    const selected = active && active.document.uri.scheme === 'file' ? stateForPath(active.document.uri.fsPath) : null;
+    const fallback = selected || repositoryStates.values().next().value;
+    root = fallback ? fallback.root : '';
+    base = fallback ? fallback.base : '';
+    commit = fallback ? fallback.commit : '';
+    statuses = fallback ? fallback.statuses : new Map();
+    changes = fallback ? fallback.changes : [];
+    folderChanges = fallback ? fallback.folderChanges : new Set();
+    configuredBase = fallback ? fallback.expression : '';
+  }
+  async function selectBaseline(repositoryRoot = '') {
     const sequence = ++selectionSequence;
     scanEpoch++; editEpoch++;
     const configuration = await configure();
     if (!configuration || !configuration.repository) return vscode.window.showInformationMessage('Open a Git repository to select a baseline.');
-    const selectedRoot = configuration.repository.root;
+    const selectedRoot = repositoryRoot || configuration.repository.root;
     if ((selections.get(selectedRoot) || 0) > sequence) return;
     selections.set(selectedRoot, sequence);
     const valid = () => !disposed && selections.get(selectedRoot) === sequence;
     const reference = await vscode.window.showInputBox({
       title: 'Git Baseline Highlights: Select Baseline',
-      prompt: 'Enter a commit, tag, or branch. Its current commit will be frozen as the baseline.',
+      prompt: configuration.mode === 'mergeBase'
+        ? 'Enter a commit, tag, or branch. Its merge base with HEAD will be frozen as the baseline.'
+        : 'Enter a commit, tag, or branch. Its current commit will be frozen as the baseline.',
       placeHolder: 'Commit SHA, tag, or branch',
       ignoreFocusOut: true,
       validateInput: async value => {
         if (!value.trim()) return 'Enter a commit, tag, or branch.';
-        try { await core.resolveCommit(selectedRoot, value.trim()); return null; }
+        try {
+          if (configuration.mode === 'mergeBase' && core.resolveBaseline) await core.resolveBaseline(selectedRoot, value.trim(), configuration.mode);
+          else await core.resolveCommit(selectedRoot, value.trim());
+          return null;
+        }
         catch { return 'This reference does not resolve to a commit.'; }
       },
     });
     if (!valid() || reference === undefined || !reference.trim()) return;
     try {
-      const resolved = await core.resolveCommit(selectedRoot, reference.trim());
+      const resolved = configuration.mode === 'mergeBase' && core.resolveBaseline
+        ? await core.resolveBaseline(selectedRoot, reference.trim(), configuration.mode)
+        : await core.resolveCommit(selectedRoot, reference.trim());
       if (!valid()) return;
       scanEpoch++; editEpoch++;
-      const written = await persistBaseline(selectedRoot, {commit: resolved, reference: reference.trim(), configuration: configuration.expression}, valid);
+      const written = await persistBaseline(selectedRoot, {commit: resolved, reference: reference.trim(), configuration: configuration.expression, mode: configuration.mode}, valid);
       if (written) await refresh();
     } catch { vscode.window.showErrorMessage('Cannot resolve this baseline. The previous selection is unchanged.'); }
+  }
+  async function selectBaselineForAll() {
+    const configuration = await configureRepositories();
+    if (!configuration || !configuration.repositories.length) return vscode.window.showInformationMessage('Open a Git repository to select a baseline.');
+    const reference = await vscode.window.showInputBox({
+      title: 'Git Baseline Highlights: Set Base for All Repositories',
+      prompt: configuration.mode === 'mergeBase'
+        ? 'Enter a commit, tag, or branch. Its merge base with HEAD will be frozen in every repository.'
+        : 'Enter a commit, tag, or branch. Its current commit will be frozen in every repository.',
+      placeHolder: 'Commit SHA, tag, or branch',
+      ignoreFocusOut: true,
+    });
+    if (reference === undefined || !reference.trim()) return;
+    const selected = reference.trim();
+    try {
+      for (const repository of configuration.repositories) {
+        const resolved = configuration.mode === 'mergeBase' && core.resolveBaseline
+          ? await core.resolveBaseline(repository.root, selected, configuration.mode)
+          : await core.resolveCommit(repository.root, selected);
+        await persistBaseline(repository.root, {commit: resolved, reference: selected, configuration: configuration.expression, mode: configuration.mode}, () => !disposed);
+      }
+      await refresh();
+    } catch { vscode.window.showErrorMessage('Cannot resolve this baseline in every repository. No remaining repositories were changed.'); }
   }
   function clear() {
     for (const editor of vscode.window.visibleTextEditors) for (const type of Object.values(types)) editor.setDecorations(type, []);
     statuses = new Map();
+    changes = [];
+    folderChanges = new Set();
     liveStatuses.clear();
     emitter.fire(undefined);
   }
@@ -152,16 +250,40 @@ function activate(context) {
     status.tooltip = message || (!enabled ? 'Highlights are off. Click to turn them on.' : commit ? 'Fixed baseline backgrounds: green = added, orange = replaced, pale red = deletion anchor. Click to toggle.' : 'Choose a commit, tag, or branch. No baseline is selected for this repository.');
     status.show();
   }
+  const treeProvider = {
+    onDidChangeTreeData: treeEmitter.event,
+    getChildren(element) {
+      if (!element) return [...repositoryStates.values()].map(state => ({
+        kind: 'repository', root: state.root,
+        label: path.basename(state.root) || state.root,
+        description: state.commit ? `Baseline ${state.commit.slice(0, 8)} · ${state.changes.length} changes` : 'Select baseline',
+        collapsibleState: 1,
+        command: {command: 'gitBaselineHighlights.selectBaselineForRepository', title: 'Select Baseline', arguments: [state.root]},
+      }));
+      if (element.kind !== 'repository') return [];
+      const state = repositoryStates.get(element.root);
+      if (!state) return [];
+      return state.changes.map(change => ({
+        kind: 'change', root: state.root, path: change.path,
+        label: `${change.status}  ${change.path}`,
+        description: change.oldPath && change.oldPath !== change.path ? `from ${change.oldPath}` : '',
+        collapsibleState: 0,
+        command: change.status === 'D' ? undefined : {command: 'vscode.open', title: 'Open File', arguments: [vscode.Uri.file(path.join(state.root, change.path))]},
+      }));
+    },
+    getTreeItem(element) { return element; },
+  };
   async function decorate(editor) {
     const document = editor.document;
     const ticket = editEpoch;
     const version = document.version;
-    const currentCommit = commit;
-    const currentRoot = root;
+    const currentState = document.uri.scheme === 'file' ? stateForPath(document.uri.fsPath) : null;
+    const currentCommit = currentState ? currentState.commit : '';
+    const currentRoot = currentState ? currentState.root : '';
     const file = document.uri.scheme === 'file' && currentRoot ? await core.relativeFile(currentRoot, document.uri.fsPath) : null;
-    if (ticket !== editEpoch || currentRoot !== root || currentCommit !== commit) return;
+    if (ticket !== editEpoch || repositoryStates.get(currentRoot) !== currentState) return;
     const cacheKey = `${currentRoot}\0${currentCommit}\0${file}`;
-    if (!enabled || !file || !commit || document.lineCount > 100000) {
+    if (!enabled || !file || !currentCommit || document.lineCount > 100000) {
       for (const type of Object.values(types)) editor.setDecorations(type, []);
       return;
     }
@@ -173,24 +295,25 @@ function activate(context) {
         if (!busy.has(cacheKey)) busy.set(cacheKey, core.readBaseline(currentRoot, currentCommit, file));
         const pending = busy.get(cacheKey);
         try { baseline = await pending; } finally { if (busy.get(cacheKey) === pending) busy.delete(cacheKey); }
-        if (commit === currentCommit && root === currentRoot) {
+        if (repositoryStates.get(currentRoot) === currentState) {
           blobs.set(cacheKey, baseline);
           if (blobs.size > 32) blobs.delete(blobs.keys().next().value);
         }
       }
       let marks = null;
       // 基线没有的文件须由只读扫描确认；忽略目录中的临时文件不参与装饰。
-      if (core.isText(text) && (baseline !== null || statuses.get(file) === 'A')) {
+      const statusCode = currentState.statuses.get(file);
+      if (core.isText(text) && (baseline !== null || statusCode === 'A' || statusCode === 'R' || statusCode === 'C')) {
         marks = baseline === null
           ? {added: Array.from({length: document.lineCount}, (_, i) => i), modified: [], deleted: []}
           : await core.compareBuffers(currentRoot, baseline, text, document.lineCount);
       }
-      if (disposed || !enabled || ticket !== editEpoch || version !== document.version || commit !== currentCommit || root !== currentRoot) return;
+      if (disposed || !enabled || ticket !== editEpoch || version !== document.version || repositoryStates.get(currentRoot) !== currentState) return;
       if (marks) {
-        liveStatuses.set(file, baseline === null ? 'A' : Object.values(marks).some(lines => lines.length) ? 'M' : '');
+        liveStatuses.set(`${currentRoot}\0${file}`, baseline === null ? (statusCode || 'A') : Object.values(marks).some(lines => lines.length) ? 'M' : '');
         emitter.fire(document.uri);
       } else {
-        liveStatuses.delete(file);
+        liveStatuses.delete(`${currentRoot}\0${file}`);
         emitter.fire(document.uri);
       }
       const labels = {added: 'added line', modified: 'replaced line', deleted: 'deletion anchor (deleted text is absent)'};
@@ -218,27 +341,52 @@ function activate(context) {
     const ticket = ++scanEpoch;
     editEpoch++;
     try {
-      const configuration = await configure();
+      const configuration = await configureRepositories();
       if (disposed || ticket !== scanEpoch) return;
-      if (!configuration || !configuration.repository) {
-        root = ''; commit = ''; clear(); bindWatchers(null); status.hide(); return;
+      if (!configuration || !configuration.repositories.length) {
+        repositoryStates = new Map();
+        root = ''; commit = ''; clear(); bindWatchers([]); treeEmitter.fire(undefined); status.hide(); return;
       }
-      const repository = configuration.repository;
-      if (root !== repository.root) { root = repository.root; commit = ''; clear(); blobs.clear(); busy.clear(); }
-      configuredBase = configuration.expression;
-      bindWatchers(repository);
-      const baseline = await baselineFor(root, configuredBase, ticket);
+      const next = new Map();
+      for (const repository of configuration.repositories) {
+        if (disposed || ticket !== scanEpoch) return;
+        const expression = configuration.expression;
+        const baseline = await baselineFor(repository.root, expression, ticket, configuration.mode, configuration.followBase);
+        if (disposed || ticket !== scanEpoch) return;
+        const state = {
+          root: repository.root,
+          repository,
+          expression,
+          mode: configuration.mode,
+          followBase: configuration.followBase,
+          base: baseline ? baseline.commit : '',
+          commit: '',
+          statuses: new Map(),
+          changes: [],
+          folderChanges: new Set(),
+        };
+        if (enabled && state.base) {
+          try {
+            const result = await core.scan(repository.root, state.base);
+            state.commit = result.commit;
+            state.statuses = result.statuses || new Map();
+            state.changes = result.changes || [];
+            rebuildFolderChanges(state);
+          } catch (error) {
+            output.appendLine(`Baseline refresh failed for ${repository.root}: ${error.message}`);
+          }
+        }
+        next.set(repository.root, state);
+      }
       if (disposed || ticket !== scanEpoch) return;
-      base = baseline ? baseline.commit : '';
-      if (!enabled || !base) { commit = ''; clear(); display(); return; }
-      const result = await core.scan(root, base);
-      if (disposed || ticket !== scanEpoch || !enabled) return;
-      if (result.commit !== commit) { blobs.clear(); busy.clear(); }
-      commit = result.commit;
-      statuses = result.statuses;
-      liveStatuses.clear(); emitter.fire(undefined); display(); await visible();
+      repositoryStates = next;
+      bindWatchers(configuration.repositories);
+      blobs.clear(); busy.clear();
+      selectActiveState();
+      liveStatuses.clear(); emitter.fire(undefined); treeEmitter.fire(undefined); display(); await visible();
     } catch (error) {
       if (ticket !== scanEpoch || disposed) return;
+      repositoryStates = new Map();
       commit = ''; clear(); display(`Baseline unavailable: ${error.message}. Select another baseline or refresh.`);
       output.appendLine(`Baseline refresh failed: ${error.message}`);
     }
@@ -250,18 +398,28 @@ function activate(context) {
   const provider = {
     onDidChangeFileDecorations: emitter.event,
     async provideFileDecoration(uri) {
-      if (!visual.showFileBadges || !enabled || !commit || uri.scheme !== 'file') return undefined;
-      const providerRoot = root;
-      const providerCommit = commit;
+      if (!visual.showFileBadges || !enabled || uri.scheme !== 'file') return undefined;
+      const repository = stateForPath(uri.fsPath);
+      if (!repository || !repository.commit) return undefined;
+      const providerRoot = repository.root;
+      const providerCommit = repository.commit;
       const file = await core.relativeFile(providerRoot, uri.fsPath);
-      if (!visual.showFileBadges || !enabled || providerRoot !== root || providerCommit !== commit) return undefined;
-      const state = liveStatuses.has(file) ? liveStatuses.get(file) : statuses.get(file);
-      if (state === 'A') return {badge: 'N', color: new vscode.ThemeColor('gitBaselineHighlights.added'), tooltip: `Fixed baseline ${commit.slice(0, 8)}: new file`, propagate: false};
-      if (state && state !== 'D') return {badge: 'M', color: new vscode.ThemeColor('gitBaselineHighlights.modified'), tooltip: `Fixed baseline ${commit.slice(0, 8)}: changed file`, propagate: false};
+      const current = stateForPath(uri.fsPath);
+      if (!visual.showFileBadges || !enabled || current !== repository || providerRoot !== current.root || providerCommit !== current.commit) return undefined;
+      const liveKey = `${providerRoot}\0${file}`;
+      const state = liveStatuses.has(liveKey) ? liveStatuses.get(liveKey) : repository.statuses.get(file);
+      const colors = {A: 'added', M: 'modified', R: 'modified', C: 'modified', D: 'deleted'};
+      const badges = {A: 'N', M: 'M', R: '⇄', C: 'C', D: '⊖'};
+      if (state && colors[state]) return {badge: badges[state], color: new vscode.ThemeColor(`gitBaselineHighlights.${colors[state]}`), tooltip: `Fixed baseline ${providerCommit.slice(0, 8)}: ${state === 'R' ? 'renamed file' : state === 'D' ? 'deleted file' : 'changed file'}`, propagate: false};
+      if (repository.folderChanges.has(file)) return {badge: '•', color: new vscode.ThemeColor('gitBaselineHighlights.modified'), tooltip: `Fixed baseline ${providerCommit.slice(0, 8)}: changed file inside`, propagate: false};
       return undefined;
     },
   };
+  const treeRegistration = typeof vscode.window.registerTreeDataProvider === 'function'
+    ? vscode.window.registerTreeDataProvider('gitBaselineHighlights.repositories', treeProvider)
+    : {dispose() {}};
   context.subscriptions.push(emitter, output, status,
+    treeEmitter, treeRegistration,
     vscode.window.registerFileDecorationProvider(provider),
     vscode.commands.registerCommand('gitBaselineHighlights.toggle', async () => {
       enabled = !enabled; editEpoch++; scanEpoch++;
@@ -271,7 +429,9 @@ function activate(context) {
     }),
     vscode.commands.registerCommand('gitBaselineHighlights.refresh', refresh),
     vscode.commands.registerCommand('gitBaselineHighlights.selectBaseline', selectBaseline),
-    vscode.commands.registerCommand('gitBaselineHighlights.showLegend', () => vscode.window.showInformationMessage('Fixed baseline backgrounds: green = added lines; orange = replaced lines; pale red = deletion anchors. Git keeps its gutter, overview ruler, and file badges by default. Optional gutter icons, overview ruler marks, and N/M file badges can be enabled separately in settings. Ignored files, binary text, files over 2 MiB, and documents over 100,000 lines are skipped.')),
+    vscode.commands.registerCommand('gitBaselineHighlights.selectBaselineForRepository', selectBaseline),
+    vscode.commands.registerCommand('gitBaselineHighlights.selectBaselineForAll', selectBaselineForAll),
+    vscode.commands.registerCommand('gitBaselineHighlights.showLegend', () => vscode.window.showInformationMessage('Fixed baseline backgrounds: green = added lines; orange = replaced lines; pale red = deletion anchors. Git keeps its gutter, overview ruler, and file badges by default. Optional gutter icons, overview ruler marks, and A/M/D/R file badges plus changed-folder markers can be enabled separately in settings. Ignored files, binary text, files over 2 MiB, and documents over 100,000 lines are skipped.')),
     vscode.workspace.onDidChangeTextDocument(event => { if (vscode.window.visibleTextEditors.some(e => e.document === event.document)) scheduleText(); }),
     vscode.workspace.onDidSaveTextDocument(scheduleScan),
     vscode.workspace.onDidCreateFiles(scheduleScan), vscode.workspace.onDidDeleteFiles(scheduleScan), vscode.workspace.onDidRenameFiles(scheduleScan),

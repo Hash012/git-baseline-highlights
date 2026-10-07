@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Discover nested Git repositories with configurable scan depth.
+- Add a repositories and changed-files view with a set-base-for-all command.
+- Preserve A/M/D/R change states and changed-folder Explorer markers.
+- Detect renames instead of always reducing them to delete plus add.
+- Add direct, merge-base and optionally moving configured-baseline modes.
+
 ## 0.2.1
 
 - Default to subtle line backgrounds so Git keeps its gutter, overview ruler and Explorer decorations.

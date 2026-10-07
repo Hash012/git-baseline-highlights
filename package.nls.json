@@ -5,9 +5,18 @@
   "command.toggle": "Git Baseline Highlights: Toggle Highlights",
   "command.refresh": "Git Baseline Highlights: Refresh Highlights",
   "command.showLegend": "Git Baseline Highlights: Show Legend",
+  "command.selectBaselineForAll": "Git Baseline Highlights: Set Base for All Repositories",
+  "command.selectBaselineForRepository": "Git Baseline Highlights: Select Repository Baseline",
+  "view.container": "Git Baseline Highlights",
+  "view.repositories": "Repositories",
   "config.repository": "Optional repository directory, absolute or relative to the active workspace folder. Empty automatically discovers the active Git repository.",
   "config.base": "Optional commit, tag, or branch. Changing this value resolves and freezes the commit; refresh does not follow moving references. Leave empty to select a baseline using the command.",
+  "config.comparisonMode": "How to resolve a branch or tag baseline.",
+  "config.comparisonMode.direct": "Compare directly against the selected commit.",
+  "config.comparisonMode.mergeBase": "Compare against the merge base of the selected ref and HEAD, like a pull-request review.",
+  "config.followBase": "Re-resolve a configured branch or tag on every refresh instead of freezing its first resolved commit.",
+  "config.scanDepth": "Maximum directory depth for discovering nested Git repositories. 0 only checks workspace roots.",
   "config.showGutterIcons": "Show baseline gutter icons. Disabled by default to keep Git gutter marks clear.",
   "config.showOverviewRuler": "Show baseline marks in the overview ruler. Disabled by default to keep Git marks clear.",
-  "config.showFileBadges": "Show N/M baseline file badges. Disabled by default to keep Git file badges clear."
+  "config.showFileBadges": "Show A/M/D/R baseline file badges and changed-folder markers. Disabled by default to keep Git file badges clear."
 }

@@ -16,6 +16,13 @@ test('空文件边界、纯新增、替换与删除位置', () => {
 });
 test('NUL文件状态保留空格、中文与换行路径', () => {
   assert.deepEqual([...core.parseStatuses(Buffer.from('A\0中文 空格\n.txt\0M\0[x].py\0D\0gone\0'))], [['中文 空格\n.txt','A'], ['[x].py','M'], ['gone','D']]);
+  const changes = Buffer.from('R087\0旧.txt\0新.txt\0D\0删除.txt\0M\0修改.txt\0');
+  assert.deepEqual(core.parseChanges(changes), [
+    {status:'R', score:87, oldPath:'旧.txt', path:'新.txt'},
+    {status:'D', path:'删除.txt'},
+    {status:'M', path:'修改.txt'},
+  ]);
+  assert.deepEqual([...core.parseStatuses(changes)], [['旧.txt','D'], ['新.txt','R'], ['删除.txt','D'], ['修改.txt','M']]);
   assert.equal(core.relativeInside('/tmp/repo', '/tmp/repository/a'), null);
   assert.equal(core.relativeInside('/tmp/repo', '/tmp/repo/../secret'), null);
   assert.equal(core.relativeInside('/tmp/repo', '/tmp/repo/中文.py'), '中文.py');

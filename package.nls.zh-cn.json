@@ -5,9 +5,18 @@
   "command.toggle": "Git 固定基线标记：开关标记",
   "command.refresh": "Git 固定基线标记：刷新标记",
   "command.showLegend": "Git 固定基线标记：查看图例",
+  "command.selectBaselineForAll": "Git 固定基线标记：为所有仓库设置基线",
+  "command.selectBaselineForRepository": "Git 固定基线标记：选择仓库基线",
+  "view.container": "Git 固定基线标记",
+  "view.repositories": "仓库",
   "config.repository": "可选仓库目录，可绝对路径或相对于当前工作区目录；留空自动探测当前 Git 仓库。",
   "config.base": "可选提交、标签或分支；修改配置时解析并冻结当前提交，刷新不跟随移动引用。留空可通过命令选择基线。",
+  "config.comparisonMode": "选择分支或标签基线的解析方式。",
+  "config.comparisonMode.direct": "直接与所选提交比较。",
+  "config.comparisonMode.mergeBase": "与所选引用和 HEAD 的共同祖先比较，适合 PR 风格审查。",
+  "config.followBase": "每次刷新重新解析配置中的分支或标签，而不是冻结第一次解析出的提交。",
+  "config.scanDepth": "探测嵌套 Git 仓库的最大目录深度；0 只检查工作区根目录。",
   "config.showGutterIcons": "显示基线行号边缘图标。默认关闭，让 Git 行号边缘标记保持清晰。",
   "config.showOverviewRuler": "显示基线概览标尺标记。默认关闭，让 Git 标尺标记保持清晰。",
-  "config.showFileBadges": "显示基线 N/M 文件徽标。默认关闭，让 Git 文件徽标保持清晰。"
+  "config.showFileBadges": "显示基线 A/M/D/R 文件徽标和变更目录标记。默认关闭，让 Git 文件徽标保持清晰。"
 }

@@ -2,7 +2,7 @@
   "name": "git-baseline-highlights",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "hash012",
   "engines": {
     "vscode": "^1.85.0"
@@ -36,8 +36,48 @@
       {
         "command": "gitBaselineHighlights.showLegend",
         "title": "%command.showLegend%"
+      },
+      {
+        "command": "gitBaselineHighlights.selectBaselineForAll",
+        "title": "%command.selectBaselineForAll%"
+      },
+      {
+        "command": "gitBaselineHighlights.selectBaselineForRepository",
+        "title": "%command.selectBaselineForRepository%"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitBaselineHighlights",
+          "title": "%view.container%",
+          "icon": "assets/view.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitBaselineHighlights": [
+        {
+          "id": "gitBaselineHighlights.repositories",
+          "name": "%view.repositories%",
+          "contextualTitle": "%view.repositories%"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitBaselineHighlights.selectBaselineForAll",
+          "when": "view == gitBaselineHighlights.repositories",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitBaselineHighlights.refresh",
+          "when": "view == gitBaselineHighlights.repositories",
+          "group": "navigation@2"
+        }
+      ]
+    },
     "configuration": {
       "title": "Git Baseline Highlights",
       "properties": {
@@ -50,6 +90,31 @@
           "type": "string",
           "default": "",
           "description": "%config.base%"
+        },
+        "gitBaselineHighlights.comparisonMode": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "mergeBase"
+          ],
+          "enumDescriptions": [
+            "%config.comparisonMode.direct%",
+            "%config.comparisonMode.mergeBase%"
+          ],
+          "default": "direct",
+          "description": "%config.comparisonMode%"
+        },
+        "gitBaselineHighlights.followBase": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.followBase%"
+        },
+        "gitBaselineHighlights.scanDepth": {
+          "type": "number",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 8,
+          "description": "%config.scanDepth%"
         },
         "gitBaselineHighlights.showGutterIcons": {
           "type": "boolean",
@@ -139,7 +204,7 @@
     "url": "https://github.com/Hash012/git-baseline-highlights/issues"
   },
   "categories": [
-    "Other"
+    "SCM Providers"
   ],
   "keywords": [
     "git",
