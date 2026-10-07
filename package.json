@@ -1,0 +1,127 @@
+{
+  "name": "git-baseline-highlights",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.2.0",
+  "publisher": "hash012",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "gitBaselineHighlights.selectBaseline",
+        "title": "%command.selectBaseline%"
+      },
+      {
+        "command": "gitBaselineHighlights.toggle",
+        "title": "%command.toggle%"
+      },
+      {
+        "command": "gitBaselineHighlights.refresh",
+        "title": "%command.refresh%"
+      },
+      {
+        "command": "gitBaselineHighlights.showLegend",
+        "title": "%command.showLegend%"
+      }
+    ],
+    "configuration": {
+      "title": "Git Baseline Highlights",
+      "properties": {
+        "gitBaselineHighlights.repository": {
+          "type": "string",
+          "default": "",
+          "description": "%config.repository%"
+        },
+        "gitBaselineHighlights.base": {
+          "type": "string",
+          "default": "",
+          "description": "%config.base%"
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "gitBaselineHighlights.added",
+        "description": "Fixed baseline added color",
+        "defaults": {
+          "dark": "#5AD690",
+          "light": "#20834B",
+          "highContrast": "#5AD690"
+        }
+      },
+      {
+        "id": "gitBaselineHighlights.modified",
+        "description": "Fixed baseline modified color",
+        "defaults": {
+          "dark": "#E6B45C",
+          "light": "#AC6600",
+          "highContrast": "#E6B45C"
+        }
+      },
+      {
+        "id": "gitBaselineHighlights.deleted",
+        "description": "Fixed baseline deleted color",
+        "defaults": {
+          "dark": "#EC7777",
+          "light": "#C83030",
+          "highContrast": "#EC7777"
+        }
+      },
+      {
+        "id": "gitBaselineHighlights.addedBackground",
+        "description": "Fixed baseline addedBackground color",
+        "defaults": {
+          "dark": "#48B87518",
+          "light": "#38A06015",
+          "highContrast": "#48B87528"
+        }
+      },
+      {
+        "id": "gitBaselineHighlights.modifiedBackground",
+        "description": "Fixed baseline modifiedBackground color",
+        "defaults": {
+          "dark": "#D994381A",
+          "light": "#D994381A",
+          "highContrast": "#D9943828"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test core.test.js extension.test.js"
+  },
+  "license": "MIT",
+  "author": "Hash012",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hash012/git-baseline-highlights.git"
+  },
+  "homepage": "https://github.com/Hash012/git-baseline-highlights#readme",
+  "bugs": {
+    "url": "https://github.com/Hash012/git-baseline-highlights/issues"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "baseline",
+    "diff",
+    "decorations",
+    "highlights"
+  ]
+}

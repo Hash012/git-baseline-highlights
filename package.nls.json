@@ -1,0 +1,10 @@
+{
+  "displayName": "Git Baseline Highlights",
+  "description": "Highlight files and lines relative to a fixed Git commit without changing Git state.",
+  "command.selectBaseline": "Git Baseline Highlights: Select Baseline",
+  "command.toggle": "Git Baseline Highlights: Toggle Highlights",
+  "command.refresh": "Git Baseline Highlights: Refresh Highlights",
+  "command.showLegend": "Git Baseline Highlights: Show Legend",
+  "config.repository": "Optional repository directory, absolute or relative to the active workspace folder. Empty automatically discovers the active Git repository.",
+  "config.base": "Optional commit, tag, or branch. Changing this value resolves and freezes the commit; refresh does not follow moving references. Leave empty to select a baseline using the command."
+}

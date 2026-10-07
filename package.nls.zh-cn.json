@@ -1,0 +1,10 @@
+{
+  "displayName": "Git 固定基线标记",
+  "description": "对照固定 Git 提交标记新增及修改的文件和代码行，不改变 Git 状态。",
+  "command.selectBaseline": "Git 固定基线标记：选择基线",
+  "command.toggle": "Git 固定基线标记：开关标记",
+  "command.refresh": "Git 固定基线标记：刷新标记",
+  "command.showLegend": "Git 固定基线标记：查看图例",
+  "config.repository": "可选仓库目录，可绝对路径或相对于当前工作区目录；留空自动探测当前 Git 仓库。",
+  "config.base": "可选提交、标签或分支；修改配置时解析并冻结当前提交，刷新不跟随移动引用。留空可通过命令选择基线。"
+}
