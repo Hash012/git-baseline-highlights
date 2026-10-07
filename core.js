@@ -92,20 +92,138 @@ function parseHunks(diff, lineCount) {
   }
   return result;
 }
-function isText(buffer) {
-  return buffer.length <= MAX_BYTES && !buffer.includes(0);
+function parseDetailedHunks(diff) {
+  const result = [];
+  let current = null;
+  const finish = () => {
+    if (!current) return;
+    result.push(current);
+    current = null;
+  };
+  for (const line of diff.replace(/\r\n/g, '\n').split('\n')) {
+    const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (match) {
+      finish();
+      current = {
+        oldStart: Number(match[1]) ? Number(match[1]) - 1 : 0,
+        oldCount: match[2] === undefined ? 1 : Number(match[2]),
+        newStart: Number(match[3]) ? Number(match[3]) - 1 : 0,
+        newCount: match[4] === undefined ? 1 : Number(match[4]),
+        oldLines: [], newLines: [],
+      };
+    } else if (current && line.startsWith('-')) {
+      current.oldLines.push(line.slice(1));
+    } else if (current && line.startsWith('+')) {
+      current.newLines.push(line.slice(1));
+    }
+  }
+  finish();
+  return result;
 }
-async function compareBuffers(root, baseline, current, lineCount) {
-  if (!isText(baseline) || !isText(current)) return null;
+function isText(buffer) {
+  return Buffer.isBuffer(buffer) && buffer.length <= MAX_BYTES && !buffer.includes(0);
+}
+function linesOf(buffer) {
+  if (!Buffer.isBuffer(buffer)) return [];
+  const lines = buffer.toString('utf8').replace(/\r\n/g, '\n').split('\n');
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+function emptyProjectionMarks() {
+  return {added: [], modified: [], deleted: [], weakAdded: [], weakModified: [], weakDeleted: []};
+}
+function pushLine(list, line, limit) {
+  if (line >= 0 && line < limit && list[list.length - 1] !== line) list.push(line);
+}
+function mapLineThroughEdits(index, edits) {
+  let offset = 0;
+  for (const edit of edits) {
+    const end = edit.oldStart + edit.oldCount;
+    if (edit.oldCount > 0 && index >= edit.oldStart && index < end) {
+      return {
+        lines: Array.from({length: edit.newCount}, (_, i) => edit.newStart + i),
+        changed: true,
+      };
+    }
+    if (edit.oldStart <= index) offset += edit.newCount - edit.oldCount;
+    else break;
+  }
+  return {lines: [index + offset], changed: false};
+}
+async function diffBuffers(root, before, after) {
+  if (!isText(before) || !isText(after)) return [];
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'git-baseline-highlights-'));
   try {
     await fs.chmod(directory, 0o700);
-    const before = path.join(directory, 'before');
-    const after = path.join(directory, 'after');
-    await Promise.all([fs.writeFile(before, baseline, {mode: 0o600}), fs.writeFile(after, current, {mode: 0o600})]);
-    const output = await git(root, ['diff', '--no-color', '--no-index', '--no-ext-diff', '--no-textconv', '--unified=0', '--', before, after], [1]);
-    return parseHunks(output.toString('utf8'), lineCount);
+    const beforeFile = path.join(directory, 'before');
+    const afterFile = path.join(directory, 'after');
+    await Promise.all([fs.writeFile(beforeFile, before, {mode: 0o600}), fs.writeFile(afterFile, after, {mode: 0o600})]);
+    const output = await git(root, ['diff', '--no-color', '--no-index', '--no-ext-diff', '--no-textconv', '--unified=0', '--', beforeFile, afterFile], [1]);
+    return parseDetailedHunks(output.toString('utf8'));
   } finally { await fs.rm(directory, {recursive: true, force: true}); }
+}
+async function compareBuffers(root, baseline, current, lineCount) {
+  if (!isText(baseline) || !isText(current)) return null;
+  const edits = await diffBuffers(root, baseline, current);
+  const result = {added: [], modified: [], deleted: []};
+  for (const edit of edits) {
+    if (edit.newCount > 0) {
+      const target = edit.oldCount ? result.modified : result.added;
+      for (let line = edit.newStart; line < edit.newStart + edit.newCount; line++) pushLine(target, line, lineCount);
+    } else if (edit.oldCount > 0 && lineCount > 0) {
+      pushLine(result.deleted, Math.min(Math.max(edit.newStart, 0), lineCount - 1), lineCount);
+    }
+  }
+  return result;
+}
+async function projectBuffers(root, start, end, target, lineCount) {
+  const result = emptyProjectionMarks();
+  if (!isText(target) || !isText(end) || lineCount <= 0) return result;
+  const endLines = linesOf(end);
+  const targetLines = linesOf(target);
+  const ab = !isText(start)
+    ? [{oldStart: 0, oldCount: 0, newStart: 0, newCount: endLines.length, oldLines: [], newLines: endLines}]
+    : await diffBuffers(root, start, end);
+  if (!ab.length) return result;
+  const bc = await diffBuffers(root, end, target);
+  const ac = !isText(start)
+    ? [{oldStart: 0, oldCount: 0, newStart: 0, newCount: targetLines.length, oldLines: [], newLines: targetLines}]
+    : await diffBuffers(root, start, target);
+  const markBLines = (edit, kind) => {
+    const weakKind = `weak${kind[0].toUpperCase()}${kind.slice(1)}`;
+    for (let index = edit.newStart; index < edit.newStart + edit.newCount; index++) {
+      const mapped = mapLineThroughEdits(index, bc);
+      for (const line of mapped.lines) pushLine(mapped.changed ? result[weakKind] : result[kind], line, lineCount);
+    }
+  };
+  for (const edit of ab) {
+    if (edit.newCount > 0) markBLines(edit, edit.oldCount ? 'modified' : 'added');
+    else if (edit.oldCount > 0) {
+      const relevant = ac.filter(candidate => {
+        const left = Math.max(edit.oldStart, candidate.oldStart);
+        const right = Math.min(edit.oldStart + edit.oldCount, candidate.oldStart + candidate.oldCount);
+        return right > left;
+      });
+      const deletion = relevant.find(candidate => candidate.newCount === 0);
+      if (deletion) pushLine(result.deleted, Math.min(Math.max(deletion.newStart, 0), lineCount - 1), lineCount);
+      else for (const candidate of relevant) {
+        for (let line = candidate.newStart; line < candidate.newStart + candidate.newCount; line++) pushLine(result.weakDeleted, line, lineCount);
+      }
+    }
+  }
+  return result;
+}
+async function mapProjectedMarks(root, target, current, marks, lineCount) {
+  const result = emptyProjectionMarks();
+  if (!marks || !isText(target) || !isText(current) || lineCount <= 0) return result;
+  const edits = await diffBuffers(root, target, current);
+  for (const [kind, lines] of Object.entries(marks)) {
+    for (const index of lines) {
+      const mapped = mapLineThroughEdits(index, edits);
+      for (const line of mapped.lines) pushLine(result[kind], line, lineCount);
+    }
+  }
+  return result;
 }
 async function readBaseline(root, commit, file) {
   // 先检查字面路径：含通配符的不存在路径可能被 Git 当作零匹配版本模式处理。
@@ -120,6 +238,24 @@ async function resolveBaseline(root, reference, mode = 'direct') {
   const commit = await resolveCommit(root, reference);
   if (mode !== 'mergeBase') return commit;
   return (await git(root, ['merge-base', commit, 'HEAD'])).toString().trim();
+}
+async function isAncestor(root, older, newer) {
+  const left = await resolveCommit(root, older);
+  const right = await resolveCommit(root, newer);
+  return (await git(root, ['merge-base', left, right])).toString().trim() === left;
+}
+async function scanBetween(root, start, end) {
+  const from = await resolveCommit(root, start);
+  const to = await resolveCommit(root, end);
+  const changes = parseChanges(await git(root, ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--name-status', '-z', '--find-renames', from, to, '--']));
+  const statuses = new Map();
+  for (const change of changes) {
+    if (change.status === 'R' || change.status === 'C') {
+      statuses.set(change.oldPath, 'D');
+      statuses.set(change.path, change.status);
+    } else statuses.set(change.path, change.status);
+  }
+  return {start: from, end: to, commit: to, statuses, changes};
 }
 async function discover(directory) {
   try {
@@ -172,4 +308,4 @@ async function relativeFile(root, file) {
     catch { return null; }
   }
 }
-module.exports = {MAX_BYTES, git, relativeInside, parseStatuses, parseChanges, scan, parseHunks, isText, compareBuffers, readBaseline, resolveCommit, resolveBaseline, discover, discoverAll, relativeFile};
+module.exports = {MAX_BYTES, git, relativeInside, parseStatuses, parseChanges, scan, scanBetween, parseHunks, parseDetailedHunks, isText, compareBuffers, projectBuffers, mapProjectedMarks, readBaseline, resolveCommit, resolveBaseline, isAncestor, discover, discoverAll, relativeFile};

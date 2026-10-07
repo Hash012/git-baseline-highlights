@@ -13,6 +13,7 @@ test('空文件边界、纯新增、替换与删除位置', () => {
   assert.deepEqual(core.parseHunks('@@ -2 +2,2 @@\n-x\n+y\n+z', 4), {added:[],modified:[1,2],deleted:[]});
   assert.deepEqual(core.parseHunks('@@ -1,2 +0,0 @@\n-x\n-y', 1), {added:[],modified:[],deleted:[0]});
   assert.deepEqual(core.parseHunks('@@ -1 +0,0 @@', 0), {added:[],modified:[],deleted:[]});
+  assert.deepEqual(core.parseDetailedHunks('--- before\n+++ after\n@@ -2 +2 @@\n-old\n+new\n'), [{oldStart:1,oldCount:1,newStart:1,newCount:1,oldLines:['old'],newLines:['new']}]);
 });
 test('NUL文件状态保留空格、中文与换行路径', () => {
   assert.deepEqual([...core.parseStatuses(Buffer.from('A\0中文 空格\n.txt\0M\0[x].py\0D\0gone\0'))], [['中文 空格\n.txt','A'], ['[x].py','M'], ['gone','D']]);
@@ -60,6 +61,31 @@ test('真实Git：只读快照、特殊文件名、未跟踪与临时diff清理'
     await assert.rejects(core.scan(root,'--not-a-commit'), /Read-only Git operation failed/);
     assert.equal(await core.compareBuffers(root,Buffer.from([0]),Buffer.from('a'),1),null);
   } finally { await fs.rm(root,{recursive:true,force:true}); }
+});
+
+test('三基线投影：保留的变更强标亮，后续演进的变更弱标亮', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'baseline-projection-'));
+  try {
+    run(root, ['init', '-q']);
+    run(root, ['config', 'user.name', '测试']); run(root, ['config', 'user.email', 'test@example.invalid']);
+    const file = path.join(root, 'value.txt');
+    await fs.writeFile(file, 'one\nvalue = 1\nthree\n');
+    run(root, ['add', '.']); run(root, ['commit', '-qm', 'A']);
+    const a = run(root, ['rev-parse', 'HEAD']);
+    await fs.writeFile(file, 'one\nvalue = 2\nthree\nadded by B\n');
+    run(root, ['add', '.']); run(root, ['commit', '-qm', 'B']);
+    const b = run(root, ['rev-parse', 'HEAD']);
+    await fs.writeFile(file, 'one\nvalue = 3\nthree\nadded by B\n');
+    run(root, ['add', '.']); run(root, ['commit', '-qm', 'C']);
+    const c = run(root, ['rev-parse', 'HEAD']);
+    const marks = await core.projectBuffers(root, await core.readBaseline(root, a, 'value.txt'), await core.readBaseline(root, b, 'value.txt'), await core.readBaseline(root, c, 'value.txt'), 4);
+    assert.deepEqual(marks.modified, []);
+    assert.deepEqual(marks.added, [3]);
+    assert.deepEqual(marks.weakModified, [1]);
+    assert.deepEqual(marks.weakAdded, []);
+    assert.equal(await core.isAncestor(root, a, b), true);
+    assert.equal(await core.isAncestor(root, b, c), true);
+  } finally { await fs.rm(root, {recursive: true, force: true}); }
 });
 
 test('仓库子目录与worktree探测；分支解析得到固定提交', async () => {

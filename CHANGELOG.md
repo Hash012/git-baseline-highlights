@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Add A→B projection onto a later C baseline with strong colors for retained changes and subdued colors for later-evolved changes.
+
+## 0.3.3
+
+- Prepare the `Git Baseline` VS Code extension for the Marketplace under the `git-baseline-marker` extension ID.
+- Package the upload artifact with the official `@vscode/vsce package` command.
+
 ## 0.3.2
 
 - Use GitHub Actions OIDC with Microsoft Entra ID and `vsce --azure-credential` for Marketplace publishing.

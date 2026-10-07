@@ -20,4 +20,4 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
-      - run: python scripts/package_extension.py
+      - run: npm run package

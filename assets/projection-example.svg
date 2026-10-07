@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">A to B projection onto C example</title>
+  <desc id="desc">A dark VS Code-style editor showing a strong retained change and a subdued later-evolved change.</desc>
+  <defs>
+    <linearGradient id="top" x1="0" x2="1">
+      <stop offset="0" stop-color="#202B3D"/><stop offset="1" stop-color="#172033"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#020617" flood-opacity=".32"/></filter>
+  </defs>
+  <rect width="1600" height="1000" fill="#0B1220"/>
+  <rect x="34" y="28" width="1532" height="944" rx="18" fill="#111827" stroke="#2A3A55" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="34" y="28" width="1532" height="66" rx="18" fill="url(#top)"/>
+  <rect x="34" y="75" width="1532" height="19" fill="url(#top)"/>
+  <circle cx="70" cy="61" r="9" fill="#EC7777"/><circle cx="99" cy="61" r="9" fill="#E6B45C"/><circle cx="128" cy="61" r="9" fill="#5AD690"/>
+  <text x="170" y="68" fill="#DDE7F4" font-family="Arial, sans-serif" font-size="24" font-weight="700">Git Baseline · A→B projection onto C</text>
+  <rect x="1210" y="43" width="286" height="36" rx="18" fill="#253A57"/>
+  <text x="1353" y="67" text-anchor="middle" fill="#9FDFFF" font-family="Arial, sans-serif" font-size="18">C target · 9c0d1e2f</text>
+
+  <!-- activity bar -->
+  <rect x="34" y="94" width="76" height="878" fill="#0D1728"/>
+  <path d="M72 145l18 18-18 18-18-18z" fill="#8ED8FF"/>
+  <path d="M55 239h34M55 255h34M55 271h22" stroke="#58779E" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="72" cy="370" r="18" fill="none" stroke="#58779E" stroke-width="6"/><path d="M72 353v34M55 370h34" stroke="#58779E" stroke-width="5"/>
+  <path d="M55 483h34M55 499h34M55 515h34" stroke="#58779E" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- repository view -->
+  <rect x="110" y="94" width="390" height="878" fill="#121D2F"/>
+  <text x="142" y="140" fill="#F1F5F9" font-family="Arial, sans-serif" font-size="22" font-weight="700">GIT BASELINE</text>
+  <text x="142" y="187" fill="#9FB4CC" font-family="Arial, sans-serif" font-size="18">REPOSITORIES</text>
+  <path d="M145 225l8 8 8-8" fill="none" stroke="#8ED8FF" stroke-width="3"/>
+  <text x="176" y="235" fill="#E8F2FF" font-family="Arial, sans-serif" font-size="22" font-weight="700">demo-service</text>
+  <rect x="140" y="260" width="330" height="154" rx="10" fill="#1A2E46" stroke="#2E5276"/>
+  <text x="162" y="291" fill="#8ED8FF" font-family="Arial, sans-serif" font-size="17" font-weight="700">A→B PROJECTION</text>
+  <text x="162" y="324" fill="#C9D7E8" font-family="Arial, sans-serif" font-size="18">A  1a2b3c4d</text>
+  <text x="162" y="355" fill="#C9D7E8" font-family="Arial, sans-serif" font-size="18">B  5e6f7a8b</text>
+  <text x="162" y="386" fill="#C9D7E8" font-family="Arial, sans-serif" font-size="18">C  9c0d1e2f</text>
+  <text x="142" y="466" fill="#9FB4CC" font-family="Arial, sans-serif" font-size="18">CHANGES A→B</text>
+  <rect x="140" y="490" width="330" height="44" rx="6" fill="#25344A"/>
+  <rect x="156" y="506" width="10" height="12" rx="2" fill="#E6B45C"/>
+  <text x="182" y="519" fill="#E8F2FF" font-family="Arial, sans-serif" font-size="18">M  src/config.js</text>
+  <text x="142" y="592" fill="#8197B1" font-family="Arial, sans-serif" font-size="17">Strong = retained in C</text>
+  <text x="142" y="622" fill="#8197B1" font-family="Arial, sans-serif" font-size="17">Subdued = later evolved</text>
+
+  <!-- editor -->
+  <rect x="500" y="94" width="1066" height="878" fill="#101826"/>
+  <rect x="500" y="94" width="1066" height="58" fill="#172437"/>
+  <rect x="522" y="110" width="230" height="42" rx="8" fill="#101826"/>
+  <text x="546" y="138" fill="#E8F2FF" font-family="Arial, sans-serif" font-size="19">config.js</text>
+  <text x="724" y="138" fill="#6E87A4" font-family="Arial, sans-serif" font-size="20">×</text>
+  <text x="560" y="206" fill="#69809C" font-family="monospace" font-size="21">1</text>
+  <text x="560" y="249" fill="#69809C" font-family="monospace" font-size="21">2</text>
+  <text x="560" y="292" fill="#69809C" font-family="monospace" font-size="21">3</text>
+  <text x="560" y="335" fill="#69809C" font-family="monospace" font-size="21">4</text>
+  <text x="560" y="378" fill="#69809C" font-family="monospace" font-size="21">5</text>
+  <text x="560" y="421" fill="#69809C" font-family="monospace" font-size="21">6</text>
+  <text x="560" y="464" fill="#69809C" font-family="monospace" font-size="21">7</text>
+  <text x="560" y="507" fill="#69809C" font-family="monospace" font-size="21">8</text>
+  <text x="560" y="550" fill="#69809C" font-family="monospace" font-size="21">9</text>
+  <rect x="594" y="348" width="900" height="44" rx="5" fill="#D9943828"/>
+  <rect x="594" y="477" width="900" height="44" rx="5" fill="#D994385C"/>
+  <rect x="594" y="348" width="5" height="44" fill="#D99438" opacity=".45"/>
+  <rect x="594" y="477" width="5" height="44" fill="#E6B45C"/>
+  <g font-family="monospace" font-size="22">
+    <text x="618" y="206" fill="#DCE8F5">export const config = {</text>
+    <text x="618" y="249" fill="#9FB4CC">  name: <tspan fill="#9FE4B8">&quot;demo&quot;</tspan>,</text>
+    <text x="618" y="292" fill="#9FB4CC">  enabled: <tspan fill="#F5C773">true</tspan>,</text>
+    <text x="618" y="335" fill="#7F98B4">  // A: value = 1</text>
+    <text x="618" y="378" fill="#E6C68D">  value: 3, <tspan fill="#B59B76">// evolved in C</tspan></text>
+    <text x="618" y="421" fill="#9FB4CC">  stable: <tspan fill="#F5C773">true</tspan>,</text>
+    <text x="618" y="464" fill="#9FB4CC">  label: <tspan fill="#9FE4B8">&quot;baseline&quot;</tspan>,</text>
+    <text x="618" y="507" fill="#F5D28F">  extra: <tspan fill="#9FE4B8">&quot;from B&quot;</tspan>, <tspan fill="#B59B76">// retained</tspan></text>
+    <text x="618" y="550" fill="#DCE8F5">};</text>
+  </g>
+
+  <!-- legend -->
+  <rect x="594" y="650" width="900" height="160" rx="12" fill="#162439" stroke="#2B4564"/>
+  <text x="626" y="692" fill="#F1F5F9" font-family="Arial, sans-serif" font-size="20" font-weight="700">Projection legend</text>
+  <rect x="626" y="718" width="22" height="22" rx="4" fill="#D994385C"/><text x="665" y="737" fill="#DDE7F4" font-family="Arial, sans-serif" font-size="18">Strong: A→B change retained in C</text>
+  <rect x="1012" y="718" width="22" height="22" rx="4" fill="#D9943828"/><text x="1051" y="737" fill="#DDE7F4" font-family="Arial, sans-serif" font-size="18">Subdued: later evolved in C</text>
+  <text x="626" y="780" fill="#7891AD" font-family="Arial, sans-serif" font-size="16">C is the target snapshot; current unsaved text is mapped onto it.</text>
+</svg>

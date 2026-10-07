@@ -38,11 +38,12 @@ def package(root=ROOT):
     for kind, path in [('Microsoft.VisualStudio.Code.Manifest', 'package.json'), ('Microsoft.VisualStudio.Services.Content.Details', 'README.md'), ('Microsoft.VisualStudio.Services.Content.License', 'LICENSE')]:
         assets.append(element('Asset', {'Type': kind, 'Path': 'extension/' + path, 'Addressable': 'true'}))
     manifest.append(assets)
-    contents = '''<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="json" ContentType="application/json"/><Default Extension="js" ContentType="application/javascript"/><Default Extension="md" ContentType="text/markdown"/><Default Extension="svg" ContentType="image/svg+xml"/><Default Extension="vsixmanifest" ContentType="text/xml"/><Override PartName="/extension/LICENSE" ContentType="text/plain"/></Types>'''
+    contents = '''<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="json" ContentType="application/json"/><Default Extension="js" ContentType="application/javascript"/><Default Extension="md" ContentType="text/markdown"/><Default Extension="svg" ContentType="image/svg+xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="vsixmanifest" ContentType="text/xml"/><Override PartName="/extension/LICENSE" ContentType="text/plain"/></Types>'''
     files = [root / name for name in ['package.json', 'README.md', 'README.zh-CN.md', 'LICENSE', 'CHANGELOG.md']]
     files += sorted(root.glob('package.nls*.json'))
     files += sorted(p for p in root.glob('*.js') if not p.name.endswith('.test.js'))
     files += sorted((root / 'assets').glob('*.svg'))
+    files += sorted((root / 'assets').glob('*.png'))
     for file in files:
         if not file.is_file() or file.is_symlink():
             raise ValueError('缺少公开文件或遇到符号链接：' + str(file))

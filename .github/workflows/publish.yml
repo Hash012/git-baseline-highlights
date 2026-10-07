@@ -32,4 +32,4 @@ jobs:
           test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
       - run: npm test
       - name: Publish to Visual Studio Marketplace
-        run: npx --yes @vscode/vsce publish --azure-credential
+        run: npx --yes @vscode/vsce publish --no-dependencies --no-yarn --azure-credential

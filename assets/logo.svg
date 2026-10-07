@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Git Baseline A B C projection</title>
+  <desc id="desc">Three Git baseline nodes A, B and C crossing a highlighted projection track with retained and evolved change markers.</desc>
+  <rect width="1024" height="1024" rx="208" fill="#0B1220"/>
+  <rect x="28" y="28" width="968" height="968" rx="184" fill="none" stroke="#1D3557" stroke-width="20"/>
+
+  <!-- Branch history -->
+  <path d="M246 824V594c0-88 72-160 160-160h18c88 0 160-72 160-160V200" fill="none" stroke="#8ED8FF" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M406 594h176c88 0 160-72 160-160v-30" fill="none" stroke="#8ED8FF" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Pinned baseline -->
+  <path d="M142 704H882" fill="none" stroke="#F1F5F9" stroke-width="42" stroke-linecap="round"/>
+  <path d="M142 704H882" fill="none" stroke="#4B6B91" stroke-width="12" stroke-linecap="round" stroke-dasharray="2 46"/>
+
+  <!-- A/B/C baseline nodes -->
+  <circle cx="246" cy="824" r="70" fill="#0B1220" stroke="#8ED8FF" stroke-width="32"/>
+  <text x="246" y="840" text-anchor="middle" font-family="Arial, sans-serif" font-size="46" font-weight="700" fill="#8ED8FF">A</text>
+  <circle cx="584" cy="174" r="70" fill="#0B1220" stroke="#8ED8FF" stroke-width="32"/>
+  <text x="584" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="46" font-weight="700" fill="#8ED8FF">B</text>
+  <circle cx="742" cy="404" r="70" fill="#0B1220" stroke="#8ED8FF" stroke-width="32"/>
+  <text x="742" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="46" font-weight="700" fill="#8ED8FF">C</text>
+
+  <!-- Compact diff markers -->
+  <path d="M378 640l48 48-48 48-48-48z" fill="#5AD690" stroke="#0B1220" stroke-width="18"/>
+  <rect x="548" y="646" width="92" height="92" rx="18" fill="#E6B45C" stroke="#0B1220" stroke-width="18"/>
+  <path d="M780 638l54 100h-108z" fill="#EC7777" stroke="#0B1220" stroke-width="18" stroke-linejoin="round"/>
+  <circle cx="704" cy="704" r="20" fill="#D99438" opacity=".38" stroke="#F1F5F9" stroke-width="8"/>
+</svg>

@@ -1,40 +1,44 @@
-# Git Baseline Highlights
+# Git Baseline
 
 [中文使用说明](README.zh-CN.md)
 
-A VS Code extension that highlights files and lines changed since a Git commit you choose. Keep your normal Source Control view while seeing the cumulative changes from a fixed baseline.
+<p align="center"><img src="assets/logo.svg" alt="Git Baseline A/B/C projection logo" width="128"></p>
+
+A VS Code extension that lets you pin a Git baseline and see all accumulated changes in VS Code, or project an A→B change set onto a later C state. Keep your normal Source Control view while reviewing baseline history.
 
 - **Pale green background:** new files and pure inserted lines.
 - **Pale orange background:** changed files and replacement blocks.
 - **Pale red background:** the location of deleted text.
+- **Subdued projection colors:** A→B changes that were later evolved in C.
 - Compare unsaved editor contents, not just files on disk.
 - Choose a different baseline without checking out a commit or changing Git history.
 - Use local or remote Git workspaces; repository discovery is automatic.
 
 ## Install
 
-1. Search for `Storehouseconsciousness.git-baseline-highlights` in the VS Code Extensions view after the Marketplace release is available.
+1. Search for `Storehouseconsciousness.git-baseline-marker` in the VS Code Extensions view after the Marketplace release is available.
 2. Until the first Marketplace release, download the `.vsix` attachment from the [latest release](https://github.com/Hash012/git-baseline-highlights/releases/latest) and run **Extensions: Install from VSIX…**.
 3. Reload the VS Code window, then open a trusted Git workspace.
-4. Run **Git Baseline Highlights: Select Baseline**. Enter a commit hash, tag or branch.
+4. Run **Git Baseline: Select Baseline**. Enter a commit hash, tag or branch.
 
 The selection resolves to a full commit hash and is remembered for that repository. Moving a branch later does not move a baseline chosen with this command. No baseline is selected automatically on first use.
 
-The Marketplace identifier is `Storehouseconsciousness.git-baseline-highlights`. The repository also distributes source and VSIX packages for local or pre-release installation.
+The Marketplace identifier is `Storehouseconsciousness.git-baseline-marker`. The repository also distributes source and VSIX packages for local or pre-release installation.
 
 ## Use
 
 | Command | Purpose |
 | --- | --- |
-| **Git Baseline Highlights: Select Baseline** | Choose a comparison commit for the current repository. |
-| **Git Baseline Highlights: Toggle Highlights** | Show or hide the decorations. |
-| **Git Baseline Highlights: Refresh Highlights** | Recalculate file and line changes. |
-| **Git Baseline Highlights: Show Legend** | Explain the colors and limits. |
-| **Git Baseline Highlights: Set Base for All Repositories** | Pin one baseline in every discovered repository. |
+| **Git Baseline: Select Baseline** | Choose a comparison commit for the current repository. |
+| **Git Baseline: Select A→B Projection onto C** | Choose A, B and C, then project A→B changes onto C. |
+| **Git Baseline: Toggle Highlights** | Show or hide the decorations. |
+| **Git Baseline: Refresh Highlights** | Recalculate file and line changes. |
+| **Git Baseline: Show Legend** | Explain the colors and limits. |
+| **Git Baseline: Set Base for All Repositories** | Pin one baseline in every discovered repository. |
 
 The status bar shows the selected baseline. Hover over decorations for their meaning. When several Git repositories are open, each discovered repository keeps its own baseline and visible editors are decorated according to their repository; the status bar follows the active editor.
 
-The Git Baseline Highlights view lists discovered repositories and their changed files. Select a repository in the view to choose its baseline, or use the title command to set one baseline in every repository. Nested repositories are discovered up to three directory levels by default; configure `gitBaselineHighlights.scanDepth` to change that.
+The Git Baseline view lists discovered repositories and their changed files. Select a repository in the view to choose its baseline, or use the title command to set one baseline in every repository. Nested repositories are discovered up to three directory levels by default; configure `gitBaselineHighlights.scanDepth` to change that.
 
 Changes to visible, unsaved text are compared after a short debounce. Saves, file operations, window focus and Git metadata changes refresh file badges. Manual refresh is available when an external change does not emit an event.
 
@@ -52,12 +56,25 @@ These optional settings default to `false`. Enabling them may overlap Git or oth
 
 Settings take effect automatically without reloading. Keep the defaults for the coexistence layout.
 
+## Project A→B changes onto C
+
+Run **Git Baseline: Select A→B Projection onto C** and enter three commits. A is the change start, B is the change end, and C is the target state. A must be an ancestor of B, and B must be an ancestor of C. The extension never checks out a commit: it reads C's snapshots and maps the projection onto the open editor content.
+
+Retained A→B changes use the normal strong colors. Changes that C later evolved but still maps to use subdued colors. Changes reverted, deleted, or no longer mappable in C are not marked.
+
+![A to B projection onto C example](assets/projection-example.png)
+
+The example shows a retained A→B line with a strong background and a later-evolved line with a subdued background.
+
 ## Configuration
 
 Defaults work without adding a project configuration file. If needed, set these in **User Settings** to keep project files untouched:
 
 - `gitBaselineHighlights.repository`: optional repository directory; leave empty for automatic detection.
 - `gitBaselineHighlights.base`: optional baseline override; leave empty to use the per-repository selection.
+- `gitBaselineHighlights.projectionStart`: projection start A; set this together with the next two projection settings.
+- `gitBaselineHighlights.projectionEnd`: projection end B.
+- `gitBaselineHighlights.projectionTarget`: projection target C, which must be equal to or later than B.
 - `gitBaselineHighlights.comparisonMode`: `direct` compares to the selected commit; `mergeBase` compares to the common ancestor of the selected ref and `HEAD`, which is useful for PR-style review.
 - `gitBaselineHighlights.followBase`: re-resolve a configured branch or tag on every refresh; disabled by default to preserve fixed-commit semantics.
 - `gitBaselineHighlights.scanDepth`: nested Git repository discovery depth, defaulting to 3.
@@ -83,16 +100,18 @@ Temporary text comparisons use the operating system's temporary directory and ar
 
 ## Develop and package
 
-Runtime code has no npm dependencies. Node.js 22 or later is recommended for development, and packaging uses Python 3's standard library.
+Runtime code has no npm dependencies. Node.js 22 or later is recommended for development, and packaging uses the official `@vscode/vsce` CLI.
 
 ```bash
 npm test
-python scripts/package_extension.py
+npm run package
 ```
 
-For a local Azure-authenticated publish, sign in with Azure CLI and run `npm run publish:azure`. For the recommended release path, push a matching `v*.*.*` tag: GitHub Actions logs in to Microsoft Entra through GitHub OIDC, then runs `npx @vscode/vsce publish --azure-credential`. Configure the `marketplace` environment and its `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets first. Add the Entra application or managed identity as a Contributor to the `Storehouseconsciousness` Marketplace publisher.
+When the npm registry is unavailable, `npm run package:offline` creates the same release package with the bundled standard-library packer.
 
-The package is written to `dist/`. For a development session, open this folder in VS Code and run:
+For a local Azure-authenticated publish, sign in with Azure CLI and run `npm run publish:azure`. For the recommended release path, push a matching `v*.*.*` tag: GitHub Actions logs in to Microsoft Entra through GitHub OIDC, then runs `npx @vscode/vsce publish --no-dependencies --no-yarn --azure-credential`. Configure the `marketplace` environment and its `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets first. Add the Entra application or managed identity as a Contributor to the `Storehouseconsciousness` Marketplace publisher.
+
+By default, `vsce package` writes `<name>-<version>.vsix` to the project root. To write this release to `dist/`, run `npx --yes @vscode/vsce package --no-dependencies --no-yarn --out dist/git-baseline-marker-0.4.0.vsix`. For a development session, open this folder in VS Code and run:
 
 ```bash
 code --extensionDevelopmentPath="$(pwd)"

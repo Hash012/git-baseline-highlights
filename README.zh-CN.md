@@ -1,15 +1,17 @@
-# Git Baseline Highlights：Git 固定基线标记
+# Git Baseline：Git 固定基线标记
 
 [English](README.md)
 
-这个 VS Code 扩展将当前文件和你选定的 Git 提交进行比较，显示从该基线到现在的累计改动，同时保留原有 Git“更改”区。
+<p align="center"><img src="assets/logo.svg" alt="Git 固定基线 A/B/C 投影标志" width="128"></p>
+
+这个 VS Code 扩展可以固定 Git 基线查看累计改动，也可以把 A→B 的变更投影到较晚的 C 状态，同时保留原有 Git“更改”区。
 
 ## 安装与首次使用
 
-1. 首次发布到市场后，在 VS Code 扩展视图搜索 `Storehouseconsciousness.git-baseline-highlights` 并安装。
+1. 首次发布到市场后，在 VS Code 扩展视图搜索 `Storehouseconsciousness.git-baseline-marker` 并安装。
 2. 在首次发布前，可从[最新发布页面](https://github.com/Hash012/git-baseline-highlights/releases/latest)下载 `.vsix`，执行 **Extensions: Install from VSIX…（扩展: 从 VSIX 安装…）**。
 3. 安装后重新加载窗口，打开一个可信的 Git 工作区。
-4. 执行 **Git 固定基线标记：选择基线**（英文界面为 **Git Baseline Highlights: Select Baseline**），输入提交哈希、标签或分支名。
+4. 执行 **Git 固定基线标记：选择基线**（英文界面为 **Git Baseline: Select Baseline**），输入提交哈希、标签或分支名。
 
 - 输入会解析为完整提交哈希，并按仓库保存。通过命令选择的基线固定不动，之后分支前进也不会改变它。
 - 首次使用不会擅自选择某个基线；选择完成后才开始标记。
@@ -22,10 +24,12 @@
 | 淡绿色行背景 | 新增文件或纯插入行。 |
 | 淡橙色行背景 | 修改文件或替换块中的现存行。 |
 | 淡红色行背景 | 删除发生的位置，已删除的文本不会重新插入。 |
+| 更淡的投影色 | A→B 的变更在 C 中已被后续修改，但仍可映射到对应内容。 |
 
 | 命令 | 用途 |
 | --- | --- |
 | Git 固定基线标记：选择基线 | 为当前仓库选择新的固定基线。 |
+| Git 固定基线标记：选择 A→B 到 C 的投影 | 选择 A、B、C，并把 A→B 的变更投影到 C。 |
 | Git 固定基线标记：开关标记 | 开关标记。 |
 | Git 固定基线标记：刷新标记 | 手动重新计算差异。 |
 | Git 固定基线标记：查看图例 | 查看图例及范围。 |
@@ -49,19 +53,36 @@
 
 修改设置后自动更新，无需重启。建议保持默认共存布局，仅在需要时开启额外标记。
 
+## 将 A→B 的变更投影到 C
+
+执行 **Git 固定基线标记：选择 A→B 到 C 的投影**，依次输入三个提交。A 是变更起点，B 是变更终点，C 是目标状态；B 必须是 C 的祖先，A 也必须是 B 的祖先。扩展不会切换分支，而是读取 C 的快照并把投影标记映射到当前编辑器内容。
+
+- A→B 的变更在 C 中原样保留：使用正常的强颜色。
+- A→B 的变更在 C 中被继续修改：使用更淡的弱颜色。
+- 变更在 C 中被回退、删除或无法映射：不标记。
+
+也可以在设置中同时配置 `gitBaselineHighlights.projectionStart`、`gitBaselineHighlights.projectionEnd` 和 `gitBaselineHighlights.projectionTarget`。三项全部填写后会启用投影；全部留空则继续使用普通单基线模式。
+
+![A 到 B 投影到 C 的效果示例](assets/projection-example.png)
+
+示例中，A→B 且被 C 原样保留的行使用强背景；被 C 后续演进的行使用较淡背景。
+
 ## 配置与迁移
 
 通常不需要配置。如需指定目标，在 VS Code **用户设置**中配置，避免将设置文件写入项目：
 
 - `gitBaselineHighlights.repository`：目标仓库目录；默认留空，自动识别。
 - `gitBaselineHighlights.base`：显式基线；默认留空，使用各仓库通过命令保存的选择。
+- `gitBaselineHighlights.projectionStart`：投影起点 A；需与下面两个投影设置一起填写。
+- `gitBaselineHighlights.projectionEnd`：投影终点 B。
+- `gitBaselineHighlights.projectionTarget`：投影目标 C，必须等于或晚于 B。
 - `gitBaselineHighlights.comparisonMode`：`direct` 直接比较所选提交；`mergeBase` 比较所选引用与 `HEAD` 的共同祖先，适合 PR 风格审查。
 - `gitBaselineHighlights.followBase`：配置的基线是分支或标签时，每次刷新重新解析；默认关闭以保持固定提交语义。
 - `gitBaselineHighlights.scanDepth`：嵌套 Git 仓库探测深度，默认 3。
 
 配置表达式改变时默认解析并保存一次，之后刷新不会跟随分支移动。开启 `followBase` 后会在刷新时重新解析。随后通过命令选择的新基线会替换保存的选择，不改设置；再次改变配置表达式则重新解析。
 
-扩展的 Marketplace 标识为 `Storehouseconsciousness.git-baseline-highlights`。迁移时也可以在新的 VS Code 环境搜索该标识；首次发布前仍可安装 VSIX。本仓库公开源代码和安装包。
+扩展的 Marketplace 标识为 `Storehouseconsciousness.git-baseline-marker`。迁移时也可以在新的 VS Code 环境搜索该标识；首次发布前仍可安装 VSIX。本仓库公开源代码和安装包。
 
 ## 对 Git 的影响与范围
 
@@ -78,15 +99,17 @@
 
 ## 开发与打包
 
-运行时无 npm 依赖。开发建议 Node.js 22 及以上，打包使用 Python 3 标准库。
+运行时无 npm 依赖。开发建议 Node.js 22 及以上，打包使用官方 `@vscode/vsce` CLI。
 
 ```bash
 npm test
-python scripts/package_extension.py
+npm run package
 ```
 
-本地使用 Azure 身份发布时，先通过 Azure CLI 登录，再运行 `npm run publish:azure`。推荐的发布方式是推送匹配的 `v*.*.*` 标签：GitHub Actions 通过 GitHub OIDC 登录 Microsoft Entra，然后执行 `npx @vscode/vsce publish --azure-credential`。首次推送标签前，需要创建并保护 `marketplace` 环境，配置 `AZURE_CLIENT_ID`、`AZURE_TENANT_ID` 和 `AZURE_SUBSCRIPTION_ID` 三个环境密钥，并将该 Entra 应用或托管身份加入 `Storehouseconsciousness` Marketplace 发布者并授予 Contributor 权限。
+如果 npm registry 不可用，可运行 `npm run package:offline`，使用仓库内置的 Python 标准库打包器生成发布包。
 
-安装包输出到 `dist/`。测试只在系统临时目录建立独立仓库，不改变被标记的项目。
+本地使用 Azure 身份发布时，先通过 Azure CLI 登录，再运行 `npm run publish:azure`。推荐的发布方式是推送匹配的 `v*.*.*` 标签：GitHub Actions 通过 GitHub OIDC 登录 Microsoft Entra，然后执行 `npx @vscode/vsce publish --no-dependencies --no-yarn --azure-credential`。首次推送标签前，需要创建并保护 `marketplace` 环境，配置 `AZURE_CLIENT_ID`、`AZURE_TENANT_ID` 和 `AZURE_SUBSCRIPTION_ID` 三个环境密钥，并将该 Entra 应用或托管身份加入 `Storehouseconsciousness` Marketplace 发布者并授予 Contributor 权限。
+
+`vsce package` 默认把 `<name>-<version>.vsix` 输出到项目根目录；本次版本可使用 `npx --yes @vscode/vsce package --no-dependencies --no-yarn --out dist/git-baseline-marker-0.4.0.vsix` 输出到 `dist/`。测试只在系统临时目录建立独立仓库，不改变被标记的项目。
 
 代码采用 [MIT 许可证](LICENSE)，欢迎通过 Issue 和 Pull Request 反馈与贡献。

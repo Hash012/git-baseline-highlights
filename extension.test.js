@@ -50,7 +50,7 @@ test('旧读取不覆盖新基线，未保存文本参与比较，关闭立即�
     },
     workspace:{isTrusted:true, get workspaceFolders(){return [{uri:{scheme:'file',fsPath:selectedRoot}}];},
       getWorkspaceFolder:()=>({uri:{scheme:'file',fsPath:selectedRoot}}),
-      getConfiguration:()=>({get:(key)=>key in visual?visual[key]:key==='repository'?'':selectedBase}),
+      getConfiguration:()=>({get:(key)=>key in visual?visual[key]:['projectionStart','projectionEnd','projectionTarget'].includes(key)?'':key==='repository'?'':selectedBase}),
       createFileSystemWatcher:()=>({onDidChange:event,onDidCreate:event,onDidDelete:event,dispose(){}}),
       onDidChangeTextDocument:event,onDidSaveTextDocument:event,onDidCreateFiles:event,onDidDeleteFiles:event,
       onDidRenameFiles:event,onDidChangeConfiguration:fn=>{configurationChanged=fn;return disposable;},onDidChangeWorkspaceFolders:event,
