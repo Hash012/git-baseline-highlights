@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+- Include Marketplace icon, license, categories, keywords and changelog metadata in offline VSIX packages.
+- Fix projected line positions after insertions and deletions, and remove highlights for reverted changes and empty files.
+- Keep unchanged lines unmarked when Git inter-hunk context is configured.
+- Respect zero scan depth and per-folder repository settings, and resolve symlink workspace paths for editor highlights and badges.
+
 ## 0.4.0
 
 - Add A→B projection onto a later C baseline with strong colors for retained changes and subdued colors for later-evolved changes.

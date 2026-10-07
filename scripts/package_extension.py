@@ -27,6 +27,12 @@ def package(root=ROOT):
         node = element(tag)
         node.text = value
         metadata.append(node)
+    icon = 'extension/' + Path(pkg['icon']).as_posix() if pkg.get('icon') else None
+    for tag, value in [('Tags', ','.join(pkg.get('keywords', []))), ('Categories', ','.join(pkg.get('categories', [])))]:
+        if value:
+            node = element(tag)
+            node.text = value
+            metadata.append(node)
     gallery_flags = element('GalleryFlags')
     gallery_flags.text = 'Public'
     metadata.append(gallery_flags)
@@ -34,12 +40,19 @@ def package(root=ROOT):
     metadata.append(properties)
     for key, value in [('Microsoft.VisualStudio.Code.Engine', pkg['engines']['vscode']), ('Microsoft.VisualStudio.Code.ExtensionKind', ','.join(pkg['extensionKind'])), ('Microsoft.VisualStudio.Code.ExtensionDependencies', ''), ('Microsoft.VisualStudio.Code.ExtensionPack', '')]:
         properties.append(element('Property', {'Id': key, 'Value': value}))
+    for tag, value in [('License', 'extension/LICENSE' if pkg.get('license') else None), ('Icon', icon)]:
+        if value:
+            node = element(tag)
+            node.text = value
+            metadata.append(node)
     installation = element('Installation')
     installation.append(element('InstallationTarget', {'Id': 'Microsoft.VisualStudio.Code'}))
     manifest.append(installation)
     assets = element('Assets')
-    for kind, path in [('Microsoft.VisualStudio.Code.Manifest', 'package.json'), ('Microsoft.VisualStudio.Services.Content.Details', 'README.md'), ('Microsoft.VisualStudio.Services.Content.License', 'LICENSE')]:
+    for kind, path in [('Microsoft.VisualStudio.Code.Manifest', 'package.json'), ('Microsoft.VisualStudio.Services.Content.Details', 'README.md'), ('Microsoft.VisualStudio.Services.Content.License', 'LICENSE'), ('Microsoft.VisualStudio.Services.Content.Changelog', 'CHANGELOG.md')]:
         assets.append(element('Asset', {'Type': kind, 'Path': 'extension/' + path, 'Addressable': 'true'}))
+    if icon:
+        assets.append(element('Asset', {'Type': 'Microsoft.VisualStudio.Services.Icons.Default', 'Path': icon, 'Addressable': 'true'}))
     manifest.append(assets)
     contents = '''<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="json" ContentType="application/json"/><Default Extension="js" ContentType="application/javascript"/><Default Extension="md" ContentType="text/markdown"/><Default Extension="svg" ContentType="image/svg+xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="vsixmanifest" ContentType="text/xml"/><Override PartName="/extension/LICENSE" ContentType="text/plain"/></Types>'''
     files = [root / name for name in ['package.json', 'README.md', 'README.zh-CN.md', 'LICENSE', 'CHANGELOG.md']]
@@ -52,6 +65,8 @@ def package(root=ROOT):
             raise ValueError('缺少公开文件或遇到符号链接：' + str(file))
     if root / pkg['main'] not in files:
         raise ValueError('扩展入口没有纳入打包')
+    if pkg.get('icon') and root / pkg['icon'] not in files:
+        raise ValueError('扩展图标没有纳入打包')
     dist = root / 'dist'
     dist.mkdir(exist_ok=True)
     output = dist / (pkg['name'] + '-' + pkg['version'] + '.vsix')
