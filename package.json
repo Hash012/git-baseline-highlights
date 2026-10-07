@@ -89,27 +89,32 @@
         "gitBaselineHighlights.repository": {
           "type": "string",
           "default": "",
-          "description": "%config.repository%"
+          "description": "%config.repository%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.base": {
           "type": "string",
           "default": "",
-          "description": "%config.base%"
+          "description": "%config.base%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.projectionStart": {
           "type": "string",
           "default": "",
-          "description": "%config.projectionStart%"
+          "description": "%config.projectionStart%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.projectionEnd": {
           "type": "string",
           "default": "",
-          "description": "%config.projectionEnd%"
+          "description": "%config.projectionEnd%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.projectionTarget": {
           "type": "string",
           "default": "",
-          "description": "%config.projectionTarget%"
+          "description": "%config.projectionTarget%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.comparisonMode": {
           "type": "string",
@@ -122,19 +127,22 @@
             "%config.comparisonMode.mergeBase%"
           ],
           "default": "direct",
-          "description": "%config.comparisonMode%"
+          "description": "%config.comparisonMode%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.followBase": {
           "type": "boolean",
           "default": false,
-          "description": "%config.followBase%"
+          "description": "%config.followBase%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.scanDepth": {
           "type": "number",
           "default": 3,
           "minimum": 0,
           "maximum": 8,
-          "description": "%config.scanDepth%"
+          "description": "%config.scanDepth%",
+          "scope": "resource"
         },
         "gitBaselineHighlights.showGutterIcons": {
           "type": "boolean",

@@ -86,8 +86,25 @@ function activate(context) {
     writes.set(repositoryRoot, pending);
     return pending;
   }
-  async function configure() {
+  function repositorySettings(config) {
+    return {
+      expression: config.get('base', '').trim(),
+      projection: {
+        start: config.get('projectionStart', '').trim(),
+        end: config.get('projectionEnd', '').trim(),
+        target: config.get('projectionTarget', '').trim(),
+      },
+      mode: config.get('comparisonMode', 'direct') === 'mergeBase' ? 'mergeBase' : 'direct',
+      followBase: config.get('followBase', false) === true,
+    };
+  }
+  async function configure(repositoryRoot = '') {
     if (!vscode.workspace.isTrusted) return null;
+    if (repositoryRoot) {
+      const configuration = await configureRepositories();
+      const repository = configuration && configuration.repositories.find(item => item.root === repositoryRoot);
+      return repository ? {repository, ...configuration.configurations.get(repositoryRoot)} : null;
+    }
     const folders = (vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file');
     const active = vscode.window.activeTextEditor;
     const folder = active && active.document.uri.scheme === 'file'
@@ -97,38 +114,41 @@ function activate(context) {
     const override = config.get('repository', '').trim();
     const directory = override ? path.resolve(folder.uri.fsPath, override)
       : active && active.document.uri.scheme === 'file' ? path.dirname(active.document.uri.fsPath) : folder.uri.fsPath;
-    const configuredMode = config.get('comparisonMode', 'direct');
     return {
       repository: await core.discover(directory),
-      expression: config.get('base', '').trim(),
-      projection: {
-        start: config.get('projectionStart', '').trim(),
-        end: config.get('projectionEnd', '').trim(),
-        target: config.get('projectionTarget', '').trim(),
-      },
-      mode: configuredMode === 'mergeBase' ? 'mergeBase' : 'direct',
-      followBase: config.get('followBase', false) === true,
+      ...repositorySettings(config),
     };
   }
   async function configureRepositories() {
-    const single = await configure();
-    if (!single) return null;
+    if (!vscode.workspace.isTrusted) return null;
     const folders = (vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file');
-    const active = vscode.window.activeTextEditor;
-    const folder = active && active.document.uri.scheme === 'file'
-      ? vscode.workspace.getWorkspaceFolder(active.document.uri) : folders[0];
-    const config = folder ? vscode.workspace.getConfiguration('gitBaselineHighlights', folder.uri) : null;
-    const depth = Math.max(0, Math.min(8, Number(config && config.get('scanDepth', 3)) || 3));
-    const override = config && config.get('repository', '').trim();
-    const directories = override && folder
-      ? [path.resolve(folder.uri.fsPath, override)]
-      : folders.map(item => item.uri.fsPath);
-    let repositories = core.discoverAll ? await core.discoverAll(
-      directories, depth,
-    ) : [];
-    // Keep the active-repository fallback for older workspaces and test hosts that do not expose recursive discovery.
-    if (!repositories.length && single.repository) repositories = [single.repository];
-    return {repositories, expression: single.expression, projection: single.projection, mode: single.mode, followBase: single.followBase};
+    const repositories = new Map();
+    const configurations = new Map();
+    // More specific workspace folders take precedence when the same repository is discovered twice.
+    for (const folder of [...folders].sort((a, b) => a.uri.fsPath.length - b.uri.fsPath.length)) {
+      const config = vscode.workspace.getConfiguration('gitBaselineHighlights', folder.uri);
+      const configuredDepth = Number(config.get('scanDepth', 3));
+      const depth = Number.isFinite(configuredDepth) ? Math.max(0, Math.min(8, Math.floor(configuredDepth))) : 3;
+      const override = config.get('repository', '').trim();
+      const directory = override ? path.resolve(folder.uri.fsPath, override) : folder.uri.fsPath;
+      let discovered = core.discoverAll ? await core.discoverAll([directory], depth) : [];
+      if (!discovered.length) {
+        const repository = await core.discover(directory);
+        if (repository) discovered = [repository];
+      }
+      for (const repository of discovered) {
+        repositories.set(repository.root, repository);
+        configurations.set(repository.root, repositorySettings(config));
+      }
+    }
+    if (!repositories.size) {
+      const active = await configure();
+      if (active && active.repository) {
+        repositories.set(active.repository.root, active.repository);
+        configurations.set(active.repository.root, active);
+      }
+    }
+    return {repositories: [...repositories.values()], configurations};
   }
   function bindWatchers(repositories) {
     const list = Array.isArray(repositories) ? repositories : repositories ? [repositories] : [];
@@ -194,6 +214,16 @@ function activate(context) {
       .sort((left, right) => right.root.length - left.root.length);
     return candidates[0] || null;
   }
+  async function stateForFile(file) {
+    const direct = stateForPath(file);
+    if (direct) return direct;
+    // Git discovers canonical roots, while editor URIs may use a symlink workspace path.
+    const candidates = [...repositoryStates.values()].sort((a, b) => b.root.length - a.root.length);
+    for (const state of candidates) {
+      if (await core.relativeFile(state.root, file)) return state;
+    }
+    return null;
+  }
   function rebuildFolderChanges(state) {
     state.folderChanges = new Set();
     for (const file of state.statuses.keys()) {
@@ -204,9 +234,10 @@ function activate(context) {
       }
     }
   }
-  function selectActiveState() {
+  async function selectActiveState(ticket) {
     const active = vscode.window.activeTextEditor;
-    const selected = active && active.document.uri.scheme === 'file' ? stateForPath(active.document.uri.fsPath) : null;
+    const selected = active && active.document.uri.scheme === 'file' ? await stateForFile(active.document.uri.fsPath) : null;
+    if (disposed || ticket !== scanEpoch) return;
     const fallback = selected || repositoryStates.values().next().value;
     root = fallback ? fallback.root : '';
     base = fallback ? fallback.base : '';
@@ -220,7 +251,7 @@ function activate(context) {
   async function selectBaseline(repositoryRoot = '') {
     const sequence = ++selectionSequence;
     scanEpoch++; editEpoch++;
-    const configuration = await configure();
+    const configuration = await configure(repositoryRoot);
     if (!configuration || !configuration.repository) return vscode.window.showInformationMessage('Open a Git repository to select a baseline.');
     const selectedRoot = repositoryRoot || configuration.repository.root;
     if ((selections.get(selectedRoot) || 0) > sequence) return;
@@ -299,9 +330,7 @@ function activate(context) {
     if (!configuration || !configuration.repositories.length) return vscode.window.showInformationMessage('Open a Git repository to select a baseline.');
     const reference = await vscode.window.showInputBox({
       title: 'Git Baseline Highlights: Set Base for All Repositories',
-      prompt: configuration.mode === 'mergeBase'
-        ? 'Enter a commit, tag, or branch. Its merge base with HEAD will be frozen in every repository.'
-        : 'Enter a commit, tag, or branch. Its current commit will be frozen in every repository.',
+      prompt: 'Enter a commit, tag, or branch. Each repository uses its configured comparison mode.',
       placeHolder: 'Commit SHA, tag, or branch',
       ignoreFocusOut: true,
     });
@@ -309,10 +338,11 @@ function activate(context) {
     const selected = reference.trim();
     try {
       for (const repository of configuration.repositories) {
-        const resolved = configuration.mode === 'mergeBase' && core.resolveBaseline
-          ? await core.resolveBaseline(repository.root, selected, configuration.mode)
+        const settings = configuration.configurations.get(repository.root);
+        const resolved = settings.mode === 'mergeBase' && core.resolveBaseline
+          ? await core.resolveBaseline(repository.root, selected, settings.mode)
           : await core.resolveCommit(repository.root, selected);
-        await persistBaseline(repository.root, {commit: resolved, reference: selected, configuration: configuration.expression, mode: configuration.mode}, () => !disposed);
+        await persistBaseline(repository.root, {commit: resolved, reference: selected, configuration: settings.expression, mode: settings.mode}, () => !disposed);
         await context.workspaceState.update(`projection:${repository.root}`, undefined);
       }
       await refresh();
@@ -365,7 +395,7 @@ function activate(context) {
     const document = editor.document;
     const ticket = editEpoch;
     const version = document.version;
-    const currentState = document.uri.scheme === 'file' ? stateForPath(document.uri.fsPath) : null;
+    const currentState = document.uri.scheme === 'file' ? await stateForFile(document.uri.fsPath) : null;
     const currentCommit = currentState ? currentState.commit : '';
     const currentRoot = currentState ? currentState.root : '';
     const file = document.uri.scheme === 'file' && currentRoot ? await core.relativeFile(currentRoot, document.uri.fsPath) : null;
@@ -466,17 +496,18 @@ function activate(context) {
       const next = new Map();
       for (const repository of configuration.repositories) {
         if (disposed || ticket !== scanEpoch) return;
-        const expression = configuration.expression;
-        const selectedProjection = await projectionFor(repository.root, configuration.projection, ticket, configuration.followBase);
-        const baseline = selectedProjection ? null : await baselineFor(repository.root, expression, ticket, configuration.mode, configuration.followBase);
+        const settings = configuration.configurations.get(repository.root);
+        const expression = settings.expression;
+        const selectedProjection = await projectionFor(repository.root, settings.projection, ticket, settings.followBase);
+        const baseline = selectedProjection ? null : await baselineFor(repository.root, expression, ticket, settings.mode, settings.followBase);
         if (disposed || ticket !== scanEpoch) return;
         const state = {
           root: repository.root,
           repository,
           expression,
           projection: selectedProjection,
-          mode: configuration.mode,
-          followBase: configuration.followBase,
+          mode: settings.mode,
+          followBase: settings.followBase,
           base: selectedProjection ? selectedProjection.start : baseline ? baseline.commit : '',
           commit: '',
           statuses: new Map(),
@@ -510,7 +541,8 @@ function activate(context) {
       repositoryStates = next;
       bindWatchers(configuration.repositories);
       blobs.clear(); busy.clear();
-      selectActiveState();
+      await selectActiveState(ticket);
+      if (disposed || ticket !== scanEpoch) return;
       liveStatuses.clear(); emitter.fire(undefined); treeEmitter.fire(undefined); display(); await visible();
     } catch (error) {
       if (ticket !== scanEpoch || disposed) return;
@@ -527,12 +559,12 @@ function activate(context) {
     onDidChangeFileDecorations: emitter.event,
     async provideFileDecoration(uri) {
       if (!visual.showFileBadges || !enabled || uri.scheme !== 'file') return undefined;
-      const repository = stateForPath(uri.fsPath);
+      const repository = await stateForFile(uri.fsPath);
       if (!repository || !repository.commit) return undefined;
       const providerRoot = repository.root;
       const providerCommit = repository.commit;
       const file = await core.relativeFile(providerRoot, uri.fsPath);
-      const current = stateForPath(uri.fsPath);
+      const current = repositoryStates.get(providerRoot);
       if (!visual.showFileBadges || !enabled || current !== repository || providerRoot !== current.root || providerCommit !== current.commit) return undefined;
       const liveKey = `${providerRoot}\0${file}`;
       const state = liveStatuses.has(liveKey) ? liveStatuses.get(liveKey) : repository.statuses.get(file);

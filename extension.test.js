@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const os = require('node:os');
 const path = require('node:path');
+const fs = require('node:fs/promises');
 const core = require('./core');
 function deferred() { let resolve; const promise = new Promise(r => {resolve=r;}); return {promise,resolve}; }
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -23,6 +24,11 @@ test('旧读取不覆盖新基线，未保存文本参与比较，关闭立即�
   const old = deferred();
   let selectedBase = 'old';
   let selectedRoot = path.join(os.tmpdir(), 'mock-repository');
+  let workspaceFolders;
+  let discoveredRepositories;
+  let scanDepth = 3;
+  const discoveryCalls = [];
+  const folderSettings = new Map();
   let provider;
   const statusItem = {show(){},hide(){},dispose(){}};
   const resolving = new Map();
@@ -48,18 +54,26 @@ test('旧读取不覆盖新基线，未保存文本参与比较，关闭立即�
       registerFileDecorationProvider(p){provider=p;return disposable;},
       showInformationMessage(){},showErrorMessage(){},showInputBox:async()=>requestedReference,onDidChangeVisibleTextEditors:event,onDidChangeActiveTextEditor:event,onDidChangeWindowState:event,
     },
-    workspace:{isTrusted:true, get workspaceFolders(){return [{uri:{scheme:'file',fsPath:selectedRoot}}];},
+    workspace:{isTrusted:true, get workspaceFolders(){return workspaceFolders || [{uri:{scheme:'file',fsPath:selectedRoot}}];},
       getWorkspaceFolder:()=>({uri:{scheme:'file',fsPath:selectedRoot}}),
-      getConfiguration:()=>({get:(key)=>key in visual?visual[key]:['projectionStart','projectionEnd','projectionTarget'].includes(key)?'':key==='repository'?'':selectedBase}),
+      getConfiguration:(_section,uri)=>({get:(key,fallback)=> {
+        const settings = uri && folderSettings.get(uri.fsPath);
+        if (settings) return key in settings ? settings[key] : key in visual ? visual[key] : fallback;
+        return key in visual?visual[key]:key==='scanDepth'?scanDepth:['projectionStart','projectionEnd','projectionTarget'].includes(key)?'':key==='repository'?'':selectedBase;
+      }}),
       createFileSystemWatcher:()=>({onDidChange:event,onDidCreate:event,onDidDelete:event,dispose(){}}),
       onDidChangeTextDocument:event,onDidSaveTextDocument:event,onDidCreateFiles:event,onDidDeleteFiles:event,
       onDidRenameFiles:event,onDidChangeConfiguration:fn=>{configurationChanged=fn;return disposable;},onDidChangeWorkspaceFolders:event,
     },
   };
   const originalLoad = Module._load;
-  const saved = {scan:core.scan,readBaseline:core.readBaseline,compareBuffers:core.compareBuffers,discover:core.discover,resolveCommit:core.resolveCommit,relativeFile:core.relativeFile};
+  const saved = {scan:core.scan,readBaseline:core.readBaseline,compareBuffers:core.compareBuffers,discover:core.discover,discoverAll:core.discoverAll,resolveCommit:core.resolveCommit,resolveBaseline:core.resolveBaseline,relativeFile:core.relativeFile};
   try {
     core.discover = async () => ({root:selectedRoot,gitDir:path.join(selectedRoot,'.git'),commonDir:path.join(selectedRoot,'.git')});
+    core.discoverAll = async (directories,depth) => {
+      discoveryCalls.push({directories,depth});
+      return discoveredRepositories ? directories.flatMap(directory => discoveredRepositories.get(directory) || []) : [];
+    };
     core.resolveCommit = async (root,reference) => {referenceCalls.push(reference);return resolving.has(reference)?resolving.get(reference).promise:reference==='selected-branch'||reference==='HEAD'?movingCommit:reference;};
     core.scan = async (root,base) => {scans.push([root,base]);return {commit:base,statuses:new Map([['a.txt','M']])};};
     core.readBaseline = async (root,commit,file) => {reads.push([root,commit,file]);return file==='ignored.txt'?null:commit==='old'?old.promise:Buffer.from('基线');};
@@ -180,6 +194,86 @@ test('旧读取不覆盖新基线，未保存文本参与比较，关闭立即�
     await commands.get('gitBaselineHighlights.refresh')();
     assert.equal(state.get(`baseline:${selectedRoot}`).commit,'head-second');
     assert.equal(referenceCalls.filter(reference=>reference==='HEAD').length,2);
+    });
+    await t.test('scanDepth为0时不会使用默认递归深度',async()=>{
+      scanDepth=0;
+      await commands.get('gitBaselineHighlights.refresh')();
+      assert.equal(discoveryCalls.at(-1).depth,0);
+      scanDepth=3;
+    });
+    await t.test('多工作区分别使用各自的基线、比较模式与扫描深度',async()=>{
+      const first = path.join(os.tmpdir(),'first-workspace');
+      const second = path.join(os.tmpdir(),'second-workspace');
+      workspaceFolders = [first,second].map(fsPath=>({uri:{scheme:'file',fsPath}}));
+      discoveredRepositories = new Map([first,second].map(root=>[root,[{root,gitDir:path.join(root,'.git'),commonDir:path.join(root,'.git')}]]));
+      folderSettings.set(first,{base:'alpha',scanDepth:0});
+      folderSettings.set(second,{base:'beta',comparisonMode:'mergeBase',scanDepth:2});
+      core.resolveBaseline = async (root,reference,mode) => {
+        assert.equal(root,second); assert.equal(mode,'mergeBase');
+        return `merge-${reference}`;
+      };
+      document.uri.fsPath=path.join(second,'a.txt');
+      await commands.get('gitBaselineHighlights.refresh')();
+      assert.deepEqual(scans.slice(-2),[[first,'alpha'],[second,'merge-beta']]);
+      assert.deepEqual(discoveryCalls.slice(-2),[{directories:[first],depth:0},{directories:[second],depth:2}]);
+      assert.ok(statusItem.text.endsWith('merge-be'));
+      requestedReference='common';
+      await commands.get('gitBaselineHighlights.selectBaselineForAll')();
+      assert.equal(state.get(`baseline:${first}`).commit,'common');
+      assert.equal(state.get(`baseline:${second}`).commit,'merge-common');
+      assert.deepEqual(scans.slice(-2),[[first,'common'],[second,'merge-common']]);
+      requestedReference='repository-selection';
+      await commands.get('gitBaselineHighlights.selectBaselineForRepository')(second);
+      assert.equal(state.get(`baseline:${second}`).commit,'merge-repository-selection');
+      assert.equal(state.get(`baseline:${second}`).configuration,'beta');
+      assert.equal(scans.at(-1)[1],'merge-repository-selection');
+      workspaceFolders=undefined; discoveredRepositories=undefined; folderSettings.clear();
+    });
+    await t.test('工作区根目录没有仓库时仍发现扫描深度之外的活动仓库',async()=>{
+      const workspace = path.join(os.tmpdir(),'container-workspace');
+      const repository = path.join(workspace,'one','two','three','four','repository');
+      const discover = core.discover;
+      const workspaceFolder=vscode.workspace.getWorkspaceFolder;
+      try {
+        workspaceFolders=[{uri:{scheme:'file',fsPath:workspace}}];
+        discoveredRepositories=new Map();
+        folderSettings.set(workspace,{base:'deep-base',scanDepth:0});
+        vscode.workspace.getWorkspaceFolder=()=>workspaceFolders[0];
+        core.discover=async directory=>directory===repository?{root:repository,gitDir:path.join(repository,'.git'),commonDir:path.join(repository,'.git')}:null;
+        document.uri.fsPath=path.join(repository,'a.txt');
+        await commands.get('gitBaselineHighlights.refresh')();
+        assert.deepEqual(scans.at(-1),[repository,'deep-base']);
+        assert.equal(rendered.get('orange.svg').length,1);
+      } finally {
+        core.discover=discover;
+        vscode.workspace.getWorkspaceFolder=workspaceFolder;
+        workspaceFolders=undefined; discoveredRepositories=undefined; folderSettings.clear();
+      }
+    });
+    await t.test('符号链接工作区匹配canonical仓库并正确标亮、显示徽标和状态栏',async()=>{
+      const temporary = await fs.mkdtemp(path.join(os.tmpdir(),'baseline-editor-alias-'));
+      try {
+        const repository = path.join(temporary,'repository');
+        const alias = path.join(temporary,'workspace-alias');
+        await fs.mkdir(repository);
+        await fs.writeFile(path.join(repository,'a.txt'),'content');
+        await fs.symlink(repository,alias,process.platform==='win32'?'junction':'dir');
+        const canonical = await fs.realpath(repository);
+        const other = path.join(temporary,'other-repository');
+        workspaceFolders=[other,alias].map(fsPath=>({uri:{scheme:'file',fsPath}}));
+        discoveredRepositories=new Map([[other,[{root:other,gitDir:path.join(other,'.git'),commonDir:path.join(other,'.git')}]],[alias,[{root:canonical,gitDir:path.join(canonical,'.git'),commonDir:path.join(canonical,'.git')}]]]);
+        folderSettings.set(other,{base:'other-base'});
+        folderSettings.set(alias,{base:'alias-base'});
+        document.uri.fsPath=path.join(alias,'a.txt');
+        await commands.get('gitBaselineHighlights.refresh')();
+        assert.ok(reads.some(([root,commit,file])=>root===canonical&&commit==='alias-base'&&file==='a.txt'));
+        assert.equal(rendered.get('orange.svg').length,1);
+        assert.equal((await provider.provideFileDecoration(document.uri)).badge,'M');
+        assert.ok(statusItem.text.endsWith('alias-ba'));
+      } finally {
+        workspaceFolders=undefined; discoveredRepositories=undefined; folderSettings.clear();
+        await fs.rm(temporary,{recursive:true,force:true});
+      }
     });
     selectedRoot=path.join(os.tmpdir(),'unselected-workspace'); selectedBase='';
     document.uri.fsPath=selectedRoot+'/a.txt';
