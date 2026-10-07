@@ -27,6 +27,9 @@ def package(root=ROOT):
         node = element(tag)
         node.text = value
         metadata.append(node)
+    gallery_flags = element('GalleryFlags')
+    gallery_flags.text = 'Public'
+    metadata.append(gallery_flags)
     properties = element('Properties')
     metadata.append(properties)
     for key, value in [('Microsoft.VisualStudio.Code.Engine', pkg['engines']['vscode']), ('Microsoft.VisualStudio.Code.ExtensionKind', ','.join(pkg['extensionKind'])), ('Microsoft.VisualStudio.Code.ExtensionDependencies', ''), ('Microsoft.VisualStudio.Code.ExtensionPack', '')]:
