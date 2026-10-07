@@ -6,5 +6,8 @@
   "command.refresh": "Git Baseline Highlights: Refresh Highlights",
   "command.showLegend": "Git Baseline Highlights: Show Legend",
   "config.repository": "Optional repository directory, absolute or relative to the active workspace folder. Empty automatically discovers the active Git repository.",
-  "config.base": "Optional commit, tag, or branch. Changing this value resolves and freezes the commit; refresh does not follow moving references. Leave empty to select a baseline using the command."
+  "config.base": "Optional commit, tag, or branch. Changing this value resolves and freezes the commit; refresh does not follow moving references. Leave empty to select a baseline using the command.",
+  "config.showGutterIcons": "Show baseline gutter icons. Disabled by default to keep Git gutter marks clear.",
+  "config.showOverviewRuler": "Show baseline marks in the overview ruler. Disabled by default to keep Git marks clear.",
+  "config.showFileBadges": "Show N/M baseline file badges. Disabled by default to keep Git file badges clear."
 }

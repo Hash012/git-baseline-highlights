@@ -4,9 +4,9 @@
 
 A VS Code extension that highlights files and lines changed since a Git commit you choose. Keep your normal Source Control view while seeing the cumulative changes from a fixed baseline.
 
-- **Green / N:** new files and pure inserted lines.
-- **Orange / M:** changed files and replacement blocks.
-- **Red diamond:** the location of deleted text.
+- **Pale green background:** new files and pure inserted lines.
+- **Pale orange background:** changed files and replacement blocks.
+- **Pale red background:** the location of deleted text.
 - Compare unsaved editor contents, not just files on disk.
 - Choose a different baseline without checking out a commit or changing Git history.
 - Use local or remote Git workspaces; repository discovery is automatic.
@@ -35,6 +35,20 @@ The status bar shows the selected baseline. Hover over decorations for their mea
 
 Changes to visible, unsaved text are compared after a short debounce. Saves, file operations, window focus and Git metadata changes refresh file badges. Manual refresh is available when an external change does not emit an event.
 
+## Coexist with Git decorations
+
+By default, baseline changes use only subtle whole-line backgrounds. Git keeps its existing gutter indicators, overview ruler and Explorer status badges. Read cumulative baseline changes from the background and uncommitted Git changes from the usual Git indicators.
+
+A line added and committed after the baseline retains a green background without an uncommitted Git indicator. Editing it again can display both. Hover over the background for its baseline meaning. Deletions use a red background on a neighboring existing line; an empty document has no line to mark.
+
+These optional settings default to `false`. Enabling them may overlap Git or other extensions:
+
+- `gitBaselineHighlights.showGutterIcons`: colored gutter diamonds.
+- `gitBaselineHighlights.showOverviewRuler`: overview ruler marks.
+- `gitBaselineHighlights.showFileBadges`: Explorer N/M badges and colors.
+
+Settings take effect automatically without reloading. Keep the defaults for the coexistence layout.
+
 ## Configuration
 
 Defaults work without adding a project configuration file. If needed, set these in **User Settings** to keep project files untouched:
@@ -58,7 +72,7 @@ Temporary text comparisons use the operating system's temporary directory and ar
 - Renames appear as deletion of the old path and addition of the new path.
 - Deleted text is represented by an anchor on a neighboring current line, not recreated in the document.
 - Special encodings or line-ending conversions can appear as broad replacement blocks.
-- Explorer badges can interact with other decoration providers; the Git Source Control view remains available.
+- Optional Explorer badges can interact with other decoration providers; the Git Source Control view remains available.
 - Git must be installed. VS Code 1.85 or later is required. Linux is locally verified; CI is configured to exercise Linux, macOS and Windows.
 
 ## Develop and package

@@ -9,15 +9,40 @@ function activate(context) {
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 20);
   status.command = 'gitBaselineHighlights.selectBaseline';
   const types = {};
-  for (const [kind, color] of [['added', 'green'], ['modified', 'orange'], ['deleted', 'red']]) {
-    const themeColor = new vscode.ThemeColor(`gitBaselineHighlights.${kind}`);
-    types[kind] = vscode.window.createTextEditorDecorationType({
-      isWholeLine: true,
-      backgroundColor: kind === 'deleted' ? undefined : new vscode.ThemeColor(`gitBaselineHighlights.${kind}Background`),
-      overviewRulerColor: themeColor, overviewRulerLane: vscode.OverviewRulerLane.Left,
-      gutterIconPath: context.asAbsolutePath(`assets/${color}.svg`), gutterIconSize: 'contain',
-      rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-    });
+  let visual = {showGutterIcons: false, showOverviewRuler: false, showFileBadges: false};
+  function rebuildVisualTypes() {
+    const active = vscode.window.activeTextEditor;
+    const folder = active && active.document.uri.scheme === 'file' ? vscode.workspace.getWorkspaceFolder(active.document.uri) : (vscode.workspace.workspaceFolders || []).find(folder => folder.uri.scheme === 'file');
+    const config = vscode.workspace.getConfiguration('gitBaselineHighlights', folder && folder.uri);
+    const next = {
+      showGutterIcons: config.get('showGutterIcons', false),
+      showOverviewRuler: config.get('showOverviewRuler', false),
+      showFileBadges: config.get('showFileBadges', false),
+    };
+    if (Object.keys(types).length && Object.keys(next).every(key => next[key] === visual[key])) return;
+    editEpoch++;
+    for (const type of Object.values(types)) {
+      for (const editor of vscode.window.visibleTextEditors) editor.setDecorations(type, []);
+      type.dispose();
+    }
+    visual = next;
+    for (const [kind, color] of [['added', 'green'], ['modified', 'orange'], ['deleted', 'red']]) {
+      const options = {
+        isWholeLine: true,
+        backgroundColor: new vscode.ThemeColor(`gitBaselineHighlights.${kind}Background`),
+        rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+      };
+      if (visual.showOverviewRuler) {
+        options.overviewRulerColor = new vscode.ThemeColor(`gitBaselineHighlights.${kind}`);
+        options.overviewRulerLane = vscode.OverviewRulerLane.Left;
+      }
+      if (visual.showGutterIcons) {
+        options.gutterIconPath = context.asAbsolutePath(`assets/${color}.svg`);
+        options.gutterIconSize = 'contain';
+      }
+      types[kind] = vscode.window.createTextEditorDecorationType(options);
+    }
+    emitter.fire(undefined);
   }
   let enabled = context.workspaceState.get('enabled', true);
   let root = '';
@@ -124,7 +149,7 @@ function activate(context) {
   function display(message) {
     status.text = !enabled ? '$(diff-ignored) Baseline off' : commit ? `$(diff) Baseline ${commit.slice(0, 8)}` : '$(diff) Select baseline';
     status.command = !enabled || commit ? 'gitBaselineHighlights.toggle' : 'gitBaselineHighlights.selectBaseline';
-    status.tooltip = message || (!enabled ? 'Highlights are off. Click to turn them on.' : commit ? 'Fixed baseline: green = added, orange = replaced, red = deletion anchor. Click to toggle.' : 'Choose a commit, tag, or branch. No baseline is selected for this repository.');
+    status.tooltip = message || (!enabled ? 'Highlights are off. Click to turn them on.' : commit ? 'Fixed baseline backgrounds: green = added, orange = replaced, pale red = deletion anchor. Click to toggle.' : 'Choose a commit, tag, or branch. No baseline is selected for this repository.');
     status.show();
   }
   async function decorate(editor) {
@@ -189,6 +214,7 @@ function activate(context) {
     editTimer = setTimeout(() => { visible(); }, 350);
   }
   async function refresh() {
+    rebuildVisualTypes();
     const ticket = ++scanEpoch;
     editEpoch++;
     try {
@@ -224,18 +250,18 @@ function activate(context) {
   const provider = {
     onDidChangeFileDecorations: emitter.event,
     async provideFileDecoration(uri) {
-      if (!enabled || !commit || uri.scheme !== 'file') return undefined;
+      if (!visual.showFileBadges || !enabled || !commit || uri.scheme !== 'file') return undefined;
       const providerRoot = root;
       const providerCommit = commit;
       const file = await core.relativeFile(providerRoot, uri.fsPath);
-      if (!enabled || providerRoot !== root || providerCommit !== commit) return undefined;
+      if (!visual.showFileBadges || !enabled || providerRoot !== root || providerCommit !== commit) return undefined;
       const state = liveStatuses.has(file) ? liveStatuses.get(file) : statuses.get(file);
       if (state === 'A') return {badge: 'N', color: new vscode.ThemeColor('gitBaselineHighlights.added'), tooltip: `Fixed baseline ${commit.slice(0, 8)}: new file`, propagate: false};
       if (state && state !== 'D') return {badge: 'M', color: new vscode.ThemeColor('gitBaselineHighlights.modified'), tooltip: `Fixed baseline ${commit.slice(0, 8)}: changed file`, propagate: false};
       return undefined;
     },
   };
-  context.subscriptions.push(emitter, output, status, ...Object.values(types),
+  context.subscriptions.push(emitter, output, status,
     vscode.window.registerFileDecorationProvider(provider),
     vscode.commands.registerCommand('gitBaselineHighlights.toggle', async () => {
       enabled = !enabled; editEpoch++; scanEpoch++;
@@ -245,7 +271,7 @@ function activate(context) {
     }),
     vscode.commands.registerCommand('gitBaselineHighlights.refresh', refresh),
     vscode.commands.registerCommand('gitBaselineHighlights.selectBaseline', selectBaseline),
-    vscode.commands.registerCommand('gitBaselineHighlights.showLegend', () => vscode.window.showInformationMessage('Fixed baseline: N/green = new files and inserted lines; M/orange = changed files and replaced lines; red diamond = deletion anchor. Git changes remain independent. Ignored files, binary text, files over 2 MiB, and documents over 100,000 lines are skipped.')),
+    vscode.commands.registerCommand('gitBaselineHighlights.showLegend', () => vscode.window.showInformationMessage('Fixed baseline backgrounds: green = added lines; orange = replaced lines; pale red = deletion anchors. Git keeps its gutter, overview ruler, and file badges by default. Optional gutter icons, overview ruler marks, and N/M file badges can be enabled separately in settings. Ignored files, binary text, files over 2 MiB, and documents over 100,000 lines are skipped.')),
     vscode.workspace.onDidChangeTextDocument(event => { if (vscode.window.visibleTextEditors.some(e => e.document === event.document)) scheduleText(); }),
     vscode.workspace.onDidSaveTextDocument(scheduleScan),
     vscode.workspace.onDidCreateFiles(scheduleScan), vscode.workspace.onDidDeleteFiles(scheduleScan), vscode.workspace.onDidRenameFiles(scheduleScan),
@@ -254,7 +280,7 @@ function activate(context) {
     vscode.window.onDidChangeWindowState(event => { if (event.focused) scheduleScan(); }),
     vscode.workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration('gitBaselineHighlights')) refresh(); }),
     vscode.workspace.onDidChangeWorkspaceFolders(refresh),
-    {dispose() { for (const watcher of watchers) watcher.dispose(); disposed = true; scanEpoch++; editEpoch++; clearTimeout(editTimer); clearTimeout(scanTimer); }},
+    {dispose() { for (const type of Object.values(types)) type.dispose(); for (const watcher of watchers) watcher.dispose(); disposed = true; scanEpoch++; editEpoch++; clearTimeout(editTimer); clearTimeout(scanTimer); }},
   );
   refresh();
 }

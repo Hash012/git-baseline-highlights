@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Default to subtle line backgrounds so Git keeps its gutter, overview ruler and Explorer decorations.
+- Represent deletion anchors with a pale red background.
+- Add independent, opt-in gutter icons, overview ruler marks and Explorer badges.
+- Apply display setting changes without reloading and clear obsolete decorations.
+
 ## 0.2.0
 
 - Rename the local extension to Git Baseline Highlights.

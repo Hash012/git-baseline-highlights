@@ -2,7 +2,7 @@
   "name": "git-baseline-highlights",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "hash012",
   "engines": {
     "vscode": "^1.85.0"
@@ -50,6 +50,21 @@
           "type": "string",
           "default": "",
           "description": "%config.base%"
+        },
+        "gitBaselineHighlights.showGutterIcons": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.showGutterIcons%"
+        },
+        "gitBaselineHighlights.showOverviewRuler": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.showOverviewRuler%"
+        },
+        "gitBaselineHighlights.showFileBadges": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.showFileBadges%"
         }
       }
     },
@@ -97,6 +112,15 @@
           "dark": "#D994381A",
           "light": "#D994381A",
           "highContrast": "#D9943828"
+        }
+      },
+      {
+        "id": "gitBaselineHighlights.deletedBackground",
+        "description": "Fixed baseline deletion anchor background",
+        "defaults": {
+          "dark": "#EC77771A",
+          "light": "#C8303015",
+          "highContrast": "#EC777728"
         }
       }
     ]

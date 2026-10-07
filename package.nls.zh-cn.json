@@ -6,5 +6,8 @@
   "command.refresh": "Git 固定基线标记：刷新标记",
   "command.showLegend": "Git 固定基线标记：查看图例",
   "config.repository": "可选仓库目录，可绝对路径或相对于当前工作区目录；留空自动探测当前 Git 仓库。",
-  "config.base": "可选提交、标签或分支；修改配置时解析并冻结当前提交，刷新不跟随移动引用。留空可通过命令选择基线。"
+  "config.base": "可选提交、标签或分支；修改配置时解析并冻结当前提交，刷新不跟随移动引用。留空可通过命令选择基线。",
+  "config.showGutterIcons": "显示基线行号边缘图标。默认关闭，让 Git 行号边缘标记保持清晰。",
+  "config.showOverviewRuler": "显示基线概览标尺标记。默认关闭，让 Git 标尺标记保持清晰。",
+  "config.showFileBadges": "显示基线 N/M 文件徽标。默认关闭，让 Git 文件徽标保持清晰。"
 }
