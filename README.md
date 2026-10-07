@@ -13,14 +13,14 @@ A VS Code extension that highlights files and lines changed since a Git commit y
 
 ## Install
 
-1. Download the `.vsix` attachment from the [latest release](https://github.com/Hash012/git-baseline-highlights/releases/latest).
-2. In VS Code, run **Extensions: Install from VSIX…** and choose the file.
+1. Search for `Storehouseconsciousness.git-baseline-highlights` in the VS Code Extensions view after the Marketplace release is available.
+2. Until the first Marketplace release, download the `.vsix` attachment from the [latest release](https://github.com/Hash012/git-baseline-highlights/releases/latest) and run **Extensions: Install from VSIX…**.
 3. Reload the VS Code window, then open a trusted Git workspace.
 4. Run **Git Baseline Highlights: Select Baseline**. Enter a commit hash, tag or branch.
 
 The selection resolves to a full commit hash and is remembered for that repository. Moving a branch later does not move a baseline chosen with this command. No baseline is selected automatically on first use.
 
-This repository distributes source and a VSIX package. It is not a listing in the VS Code Marketplace.
+The Marketplace identifier is `Storehouseconsciousness.git-baseline-highlights`. The repository also distributes source and VSIX packages for local or pre-release installation.
 
 ## Use
 
@@ -89,6 +89,8 @@ Runtime code has no npm dependencies. Node.js 22 or later is recommended for dev
 npm test
 python scripts/package_extension.py
 ```
+
+For a local publish, set `VSCE_PAT` in your environment and run `npm run publish`. For the recommended release path, push a matching `v*.*.*` tag: GitHub Actions runs tests and `npx @vscode/vsce publish --oidc`. Before the first tag, configure a Marketplace Trusted Publishing policy for this repository and workflow, and keep the `Storehouseconsciousness` publisher account selected. OIDC avoids storing a long-lived PAT in GitHub.
 
 The package is written to `dist/`. For a development session, open this folder in VS Code and run:
 

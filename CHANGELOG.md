@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Prepare Marketplace publishing under the `Storehouseconsciousness` publisher.
+- Add VSIX ignore rules and tag-triggered Marketplace publishing workflow.
+
 ## 0.3.0
 
 - Discover nested Git repositories with configurable scan depth.

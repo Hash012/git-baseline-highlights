@@ -6,8 +6,8 @@
 
 ## 安装与首次使用
 
-1. 在[最新发布页面](https://github.com/Hash012/git-baseline-highlights/releases/latest)下载 `.vsix` 安装包。
-2. 打开 VS Code 命令面板，执行 **Extensions: Install from VSIX…（扩展: 从 VSIX 安装…）**。
+1. 首次发布到市场后，在 VS Code 扩展视图搜索 `Storehouseconsciousness.git-baseline-highlights` 并安装。
+2. 在首次发布前，可从[最新发布页面](https://github.com/Hash012/git-baseline-highlights/releases/latest)下载 `.vsix`，执行 **Extensions: Install from VSIX…（扩展: 从 VSIX 安装…）**。
 3. 安装后重新加载窗口，打开一个可信的 Git 工作区。
 4. 执行 **Git 固定基线标记：选择基线**（英文界面为 **Git Baseline Highlights: Select Baseline**），输入提交哈希、标签或分支名。
 
@@ -61,7 +61,7 @@
 
 配置表达式改变时默认解析并保存一次，之后刷新不会跟随分支移动。开启 `followBase` 后会在刷新时重新解析。随后通过命令选择的新基线会替换保存的选择，不改设置；再次改变配置表达式则重新解析。
 
-迁移时在新的 VS Code 环境安装同一个 VSIX，打开目标 Git 工作区，再选择基线即可。本仓库公开源代码和安装包，尚未发布到 VS Code 扩展市场。
+扩展的 Marketplace 标识为 `Storehouseconsciousness.git-baseline-highlights`。迁移时也可以在新的 VS Code 环境搜索该标识；首次发布前仍可安装 VSIX。本仓库公开源代码和安装包。
 
 ## 对 Git 的影响与范围
 
@@ -84,6 +84,8 @@
 npm test
 python scripts/package_extension.py
 ```
+
+本地发布时可设置环境变量 `VSCE_PAT`，然后运行 `npm run publish`。推荐的发布方式是推送匹配的 `v*.*.*` 标签：GitHub Actions 会运行测试并执行 `npx @vscode/vsce publish --oidc`。首次推送标签前，需要在 Marketplace 为本仓库和该工作流配置 Trusted Publishing policy，并选择 `Storehouseconsciousness` 发布者账号。OIDC 不需要把长期 PAT 保存到 GitHub。
 
 安装包输出到 `dist/`。测试只在系统临时目录建立独立仓库，不改变被标记的项目。
 
