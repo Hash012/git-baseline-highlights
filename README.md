@@ -90,7 +90,7 @@ npm test
 python scripts/package_extension.py
 ```
 
-For a local publish, set `VSCE_PAT` in your environment and run `npm run publish`. For the recommended release path, push a matching `v*.*.*` tag: GitHub Actions runs tests and `npx @vscode/vsce publish --oidc`. Before the first tag, configure a Marketplace Trusted Publishing policy for this repository and workflow, and keep the `Storehouseconsciousness` publisher account selected. OIDC avoids storing a long-lived PAT in GitHub.
+For a local Azure-authenticated publish, sign in with Azure CLI and run `npm run publish:azure`. For the recommended release path, push a matching `v*.*.*` tag: GitHub Actions logs in to Microsoft Entra through GitHub OIDC, then runs `npx @vscode/vsce publish --azure-credential`. Configure the `marketplace` environment and its `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets first. Add the Entra application or managed identity as a Contributor to the `Storehouseconsciousness` Marketplace publisher.
 
 The package is written to `dist/`. For a development session, open this folder in VS Code and run:
 

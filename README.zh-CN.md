@@ -85,7 +85,7 @@ npm test
 python scripts/package_extension.py
 ```
 
-本地发布时可设置环境变量 `VSCE_PAT`，然后运行 `npm run publish`。推荐的发布方式是推送匹配的 `v*.*.*` 标签：GitHub Actions 会运行测试并执行 `npx @vscode/vsce publish --oidc`。首次推送标签前，需要在 Marketplace 为本仓库和该工作流配置 Trusted Publishing policy，并选择 `Storehouseconsciousness` 发布者账号。OIDC 不需要把长期 PAT 保存到 GitHub。
+本地使用 Azure 身份发布时，先通过 Azure CLI 登录，再运行 `npm run publish:azure`。推荐的发布方式是推送匹配的 `v*.*.*` 标签：GitHub Actions 通过 GitHub OIDC 登录 Microsoft Entra，然后执行 `npx @vscode/vsce publish --azure-credential`。首次推送标签前，需要创建并保护 `marketplace` 环境，配置 `AZURE_CLIENT_ID`、`AZURE_TENANT_ID` 和 `AZURE_SUBSCRIPTION_ID` 三个环境密钥，并将该 Entra 应用或托管身份加入 `Storehouseconsciousness` Marketplace 发布者并授予 Contributor 权限。
 
 安装包输出到 `dist/`。测试只在系统临时目录建立独立仓库，不改变被标记的项目。
 

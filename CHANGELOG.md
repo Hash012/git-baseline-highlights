@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Use GitHub Actions OIDC with Microsoft Entra ID and `vsce --azure-credential` for Marketplace publishing.
+- Run publishing in the protected `marketplace` environment.
+
 ## 0.3.1
 
 - Prepare Marketplace publishing under the `Storehouseconsciousness` publisher.

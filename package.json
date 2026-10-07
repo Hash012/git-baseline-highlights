@@ -2,7 +2,7 @@
   "name": "git-baseline-highlights",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "Storehouseconsciousness",
   "engines": {
     "vscode": "^1.85.0"
@@ -193,7 +193,8 @@
   "scripts": {
     "test": "node --test core.test.js extension.test.js",
     "package": "python scripts/package_extension.py",
-    "publish": "npx @vscode/vsce publish"
+    "publish": "npx @vscode/vsce publish",
+    "publish:azure": "npx @vscode/vsce publish --azure-credential"
   },
   "license": "MIT",
   "author": "Hash012",
