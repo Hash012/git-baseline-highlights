@@ -2,7 +2,7 @@
 
 [中文使用说明](README.zh-CN.md)
 
-<p align="center"><img src="assets/logo.svg" alt="Git Baseline A/B/C projection logo" width="128"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Hash012/git-baseline-highlights/main/assets/logo.png" alt="Git Baseline A/B/C projection logo" width="128"></p>
 
 A VS Code extension that lets you pin a Git baseline and see all accumulated changes in VS Code, or project an A→B change set onto a later C state. Keep your normal Source Control view while reviewing baseline history.
 
@@ -58,11 +58,11 @@ Settings take effect automatically without reloading. Keep the defaults for the 
 
 ## Project A→B changes onto C
 
-Run **Git Baseline: Select A→B Projection onto C** and enter three commits. A is the change start, B is the change end, and C is the target state. A must be an ancestor of B, and B must be an ancestor of C. The extension never checks out a commit: it reads C's snapshots and maps the projection onto the open editor content.
+Run **Git Baseline: Select A→B Projection onto C** and enter A, B, and C. A is the change start, B is the change end, and C is the target state. A must be an ancestor of B, and B must be an ancestor of C. If B is left empty, the command falls back to the original single-baseline behavior and compares A with the current working state. The extension never checks out a commit: it reads C's snapshots and maps the projection onto the open editor content.
 
 Retained A→B changes use the normal strong colors. Changes that C later evolved but still maps to use subdued colors. Changes reverted, deleted, or no longer mappable in C are not marked.
 
-![A to B projection onto C example](assets/projection-example.png)
+![A to B projection onto C example](https://raw.githubusercontent.com/Hash012/git-baseline-highlights/main/assets/projection-example.png)
 
 The example shows a retained A→B line with a strong background and a later-evolved line with a subdued background.
 
@@ -72,9 +72,9 @@ Defaults work without adding a project configuration file. If needed, set these 
 
 - `gitBaselineHighlights.repository`: optional repository directory; leave empty for automatic detection.
 - `gitBaselineHighlights.base`: optional baseline override; leave empty to use the per-repository selection.
-- `gitBaselineHighlights.projectionStart`: projection start A; set this together with the next two projection settings.
-- `gitBaselineHighlights.projectionEnd`: projection end B.
-- `gitBaselineHighlights.projectionTarget`: projection target C, which must be equal to or later than B.
+- `gitBaselineHighlights.projectionStart`: projection start A. If B and C are empty, A is used as the ordinary fixed baseline against the current working state.
+- `gitBaselineHighlights.projectionEnd`: projection end B; set this together with A and C to enable projection.
+- `gitBaselineHighlights.projectionTarget`: projection target C; set this together with A and B, and make it equal to or later than B.
 - `gitBaselineHighlights.comparisonMode`: `direct` compares to the selected commit; `mergeBase` compares to the common ancestor of the selected ref and `HEAD`, which is useful for PR-style review.
 - `gitBaselineHighlights.followBase`: re-resolve a configured branch or tag on every refresh; disabled by default to preserve fixed-commit semantics.
 - `gitBaselineHighlights.scanDepth`: nested Git repository discovery depth, defaulting to 3.

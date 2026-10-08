@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-<p align="center"><img src="assets/logo.svg" alt="Git 固定基线 A/B/C 投影标志" width="128"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Hash012/git-baseline-highlights/main/assets/logo.png" alt="Git 固定基线 A/B/C 投影标志" width="128"></p>
 
 这个 VS Code 扩展可以固定 Git 基线查看累计改动，也可以把 A→B 的变更投影到较晚的 C 状态，同时保留原有 Git“更改”区。
 
@@ -55,15 +55,15 @@
 
 ## 将 A→B 的变更投影到 C
 
-执行 **Git 固定基线标记：选择 A→B 到 C 的投影**，依次输入三个提交。A 是变更起点，B 是变更终点，C 是目标状态；B 必须是 C 的祖先，A 也必须是 B 的祖先。扩展不会切换分支，而是读取 C 的快照并把投影标记映射到当前编辑器内容。
+执行 **Git 固定基线标记：选择 A→B 到 C 的投影**，依次输入 A、B、C。A 是变更起点，B 是变更终点，C 是目标状态；B 必须是 C 的祖先，A 也必须是 B 的祖先。如果 B 留空，命令会退化为最初的单基线模式，将 A 与当前工作状态比较。扩展不会切换分支，而是读取 C 的快照并把投影标记映射到当前编辑器内容。
 
 - A→B 的变更在 C 中原样保留：使用正常的强颜色。
 - A→B 的变更在 C 中被继续修改：使用更淡的弱颜色。
 - 变更在 C 中被回退、删除或无法映射：不标记。
 
-也可以在设置中同时配置 `gitBaselineHighlights.projectionStart`、`gitBaselineHighlights.projectionEnd` 和 `gitBaselineHighlights.projectionTarget`。三项全部填写后会启用投影；全部留空则继续使用普通单基线模式。
+也可以在设置中配置这三个选项。三项全部填写后会启用投影；只填写 A、B 和 C 留空时，会将 A 作为普通固定基线，与当前工作状态比较；全部留空则继续使用普通单基线模式。
 
-![A 到 B 投影到 C 的效果示例](assets/projection-example.png)
+![A 到 B 投影到 C 的效果示例](https://raw.githubusercontent.com/Hash012/git-baseline-highlights/main/assets/projection-example.png)
 
 示例中，A→B 且被 C 原样保留的行使用强背景；被 C 后续演进的行使用较淡背景。
 
@@ -73,9 +73,9 @@
 
 - `gitBaselineHighlights.repository`：目标仓库目录；默认留空，自动识别。
 - `gitBaselineHighlights.base`：显式基线；默认留空，使用各仓库通过命令保存的选择。
-- `gitBaselineHighlights.projectionStart`：投影起点 A；需与下面两个投影设置一起填写。
-- `gitBaselineHighlights.projectionEnd`：投影终点 B。
-- `gitBaselineHighlights.projectionTarget`：投影目标 C，必须等于或晚于 B。
+- `gitBaselineHighlights.projectionStart`：投影起点 A；如果 B 和 C 留空，则将 A 作为普通固定基线，与当前工作状态比较。
+- `gitBaselineHighlights.projectionEnd`：投影终点 B；需与 A、C 一起填写才能启用投影。
+- `gitBaselineHighlights.projectionTarget`：投影目标 C；需与 A、B 一起填写，且必须等于或晚于 B。
 - `gitBaselineHighlights.comparisonMode`：`direct` 直接比较所选提交；`mergeBase` 比较所选引用与 `HEAD` 的共同祖先，适合 PR 风格审查。
 - `gitBaselineHighlights.followBase`：配置的基线是分支或标签时，每次刷新重新解析；默认关闭以保持固定提交语义。
 - `gitBaselineHighlights.scanDepth`：嵌套 Git 仓库探测深度，默认 3。

@@ -87,13 +87,16 @@ function activate(context) {
     return pending;
   }
   function repositorySettings(config) {
+    const projection = {
+      start: config.get('projectionStart', '').trim(),
+      end: config.get('projectionEnd', '').trim(),
+      target: config.get('projectionTarget', '').trim(),
+    };
+    const configuredBase = config.get('base', '').trim();
     return {
-      expression: config.get('base', '').trim(),
-      projection: {
-        start: config.get('projectionStart', '').trim(),
-        end: config.get('projectionEnd', '').trim(),
-        target: config.get('projectionTarget', '').trim(),
-      },
+      // With only A configured, compare A with the current working state.
+      expression: configuredBase || (projection.start && !projection.end && !projection.target ? projection.start : ''),
+      projection,
       mode: config.get('comparisonMode', 'direct') === 'mergeBase' ? 'mergeBase' : 'direct',
       followBase: config.get('followBase', false) === true,
     };
@@ -185,7 +188,17 @@ function activate(context) {
     const values = expressions || {start: '', end: '', target: ''};
     const configured = Object.values(values).some(Boolean);
     const complete = values.start && values.end && values.target;
-    if (configured && !complete) throw new Error('Projection requires projectionStart, projectionEnd, and projectionTarget.');
+    const singleBaseline = values.start && !values.end && !values.target;
+    if (configured && !complete && !singleBaseline) throw new Error('Projection requires projectionStart, projectionEnd, and projectionTarget.');
+    if (!complete) {
+      // Empty settings preserve a projection selected through the command
+      // palette; only an explicit A-only configuration requests fallback.
+      if (!configured) return saved || null;
+      // Do not inherit a projection selected through the command palette when
+      // settings explicitly request the single-baseline fallback.
+      if (singleBaseline && saved) await context.workspaceState.update(key, undefined);
+      return null;
+    }
     if (complete && (!saved || saved.configuration?.start !== values.start || saved.configuration?.end !== values.end || saved.configuration?.target !== values.target || followBase)) {
       const start = await core.resolveCommit(repositoryRoot, values.start);
       const end = await core.resolveCommit(repositoryRoot, values.end);
@@ -297,22 +310,36 @@ function activate(context) {
     if ((selections.get(selectedRoot) || 0) > sequence) return;
     selections.set(selectedRoot, sequence);
     const valid = () => !disposed && selections.get(selectedRoot) === sequence;
-    const prompts = [
-      ['Projection start (A)', 'Commit, tag, or branch at the beginning of the change'],
-      ['Projection end (B)', 'Commit, tag, or branch at the end of the change'],
-      ['Projection target (C)', 'Commit, tag, or branch where the change is projected'],
-    ];
-    const references = [];
-    for (const [title, prompt] of prompts) {
-      const reference = await vscode.window.showInputBox({title: `Git Baseline Highlights: ${title}`, prompt, placeHolder: 'Commit SHA, tag, or branch', ignoreFocusOut: true,
-        validateInput: async value => {
-          if (!value.trim()) return 'Enter a commit, tag, or branch.';
-          try { await core.resolveCommit(selectedRoot, value.trim()); return null; }
-          catch { return 'This reference does not resolve to a commit.'; }
-        }});
-      if (!valid() || reference === undefined || !reference.trim()) return;
-      references.push(reference.trim());
+    const resolveInput = async (title, prompt, optional = false) => vscode.window.showInputBox({
+      title: `Git Baseline Highlights: ${title}`, prompt, placeHolder: 'Commit SHA, tag, or branch', ignoreFocusOut: true,
+      validateInput: async value => {
+        if (!value.trim()) return optional ? null : 'Enter a commit, tag, or branch.';
+        try { await core.resolveCommit(selectedRoot, value.trim()); return null; }
+        catch { return 'This reference does not resolve to a commit.'; }
+      },
+    });
+    const start = await resolveInput('Projection start (A)', 'Commit, tag, or branch at the beginning of the change');
+    if (!valid() || start === undefined || !start.trim()) return;
+    const end = await resolveInput('Projection end (B)', 'Optional. Leave empty to use A as the fixed baseline and compare with the current working state.', true);
+    if (!valid() || end === undefined) return;
+    if (!end.trim()) {
+      try {
+        const resolved = configuration.mode === 'mergeBase' && core.resolveBaseline
+          ? await core.resolveBaseline(selectedRoot, start.trim(), configuration.mode)
+          : await core.resolveCommit(selectedRoot, start.trim());
+        if (!valid()) return;
+        scanEpoch++; editEpoch++;
+        const written = await persistBaseline(selectedRoot, {commit: resolved, reference: start.trim(), configuration: configuration.expression, mode: configuration.mode}, valid);
+        if (written) {
+          await context.workspaceState.update(`projection:${selectedRoot}`, undefined);
+          await refresh();
+        }
+      } catch { vscode.window.showErrorMessage('Cannot resolve this baseline. The previous selection is unchanged.'); }
+      return;
     }
+    const target = await resolveInput('Projection target (C)', 'Commit, tag, or branch where the change is projected');
+    if (!valid() || target === undefined || !target.trim()) return;
+    const references = [start.trim(), end.trim(), target.trim()];
     try {
       const [start, end, target] = await Promise.all(references.map(reference => core.resolveCommit(selectedRoot, reference)));
       if (core.isAncestor && !(await core.isAncestor(selectedRoot, start, end))) throw new Error('Projection start must be an ancestor of projection end.');
