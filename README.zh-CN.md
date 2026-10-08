@@ -108,10 +108,10 @@ npm run package
 
 如果 npm registry 不可用，可运行 `npm run package:offline`，使用仓库内置的 Python 标准库打包器生成发布包。
 
-如果 Marketplace 报错 `An extension that was made public can't be changed to private`，请丢弃旧的离线 VSIX 并重新打包。当前离线打包器会在 `extension.vsixmanifest` 中写入 `<GalleryFlags>Public</GalleryFlags>`；上传前可运行 `unzip -p dist/git-baseline-marker-0.4.1.vsix extension.vsixmanifest | grep GalleryFlags` 验证。
+如果 Marketplace 报错 `An extension that was made public can't be changed to private`，请丢弃旧的离线 VSIX 并重新打包。当前离线打包器会在 `extension.vsixmanifest` 中写入 `<GalleryFlags>Public</GalleryFlags>`；上传前可运行 `unzip -p dist/git-baseline-marker-0.4.2.vsix extension.vsixmanifest | grep GalleryFlags` 验证。
 
 本地使用 Azure 身份发布时，先通过 Azure CLI 登录，再运行 `npm run publish:azure`。推荐的发布方式是推送匹配的 `v*.*.*` 标签：GitHub Actions 通过 GitHub OIDC 登录 Microsoft Entra，然后执行 `npx @vscode/vsce publish --no-dependencies --no-yarn --azure-credential`。首次推送标签前，需要创建并保护 `marketplace` 环境，配置 `AZURE_CLIENT_ID`、`AZURE_TENANT_ID` 和 `AZURE_SUBSCRIPTION_ID` 三个环境密钥，并将该 Entra 应用或托管身份加入 `Storehouseconsciousness` Marketplace 发布者并授予 Contributor 权限。
 
-`vsce package` 默认把 `<name>-<version>.vsix` 输出到项目根目录；本次版本可使用 `npx --yes @vscode/vsce package --no-dependencies --no-yarn --out dist/git-baseline-marker-0.4.1.vsix` 输出到 `dist/`。测试只在系统临时目录建立独立仓库，不改变被标记的项目。
+`vsce package` 默认把 `<name>-<version>.vsix` 输出到项目根目录；本次版本可使用 `npx --yes @vscode/vsce package --no-dependencies --no-yarn --out dist/git-baseline-marker-0.4.2.vsix` 输出到 `dist/`。测试只在系统临时目录建立独立仓库，不改变被标记的项目。
 
 代码采用 [MIT 许可证](LICENSE)，欢迎通过 Issue 和 Pull Request 反馈与贡献。

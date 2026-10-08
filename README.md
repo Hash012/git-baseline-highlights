@@ -109,11 +109,11 @@ npm run package
 
 When the npm registry is unavailable, `npm run package:offline` creates the same release package with the bundled standard-library packer.
 
-If Marketplace reports `An extension that was made public can't be changed to private`, discard any older offline VSIX and rebuild it. The current offline packer writes `<GalleryFlags>Public</GalleryFlags>` into `extension.vsixmanifest`; verify it with `unzip -p dist/git-baseline-marker-0.4.1.vsix extension.vsixmanifest | grep GalleryFlags` before uploading.
+If Marketplace reports `An extension that was made public can't be changed to private`, discard any older offline VSIX and rebuild it. The current offline packer writes `<GalleryFlags>Public</GalleryFlags>` into `extension.vsixmanifest`; verify it with `unzip -p dist/git-baseline-marker-0.4.2.vsix extension.vsixmanifest | grep GalleryFlags` before uploading.
 
 For a local Azure-authenticated publish, sign in with Azure CLI and run `npm run publish:azure`. For the recommended release path, push a matching `v*.*.*` tag: GitHub Actions logs in to Microsoft Entra through GitHub OIDC, then runs `npx @vscode/vsce publish --no-dependencies --no-yarn --azure-credential`. Configure the `marketplace` environment and its `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets first. Add the Entra application or managed identity as a Contributor to the `Storehouseconsciousness` Marketplace publisher.
 
-By default, `vsce package` writes `<name>-<version>.vsix` to the project root. To write this release to `dist/`, run `npx --yes @vscode/vsce package --no-dependencies --no-yarn --out dist/git-baseline-marker-0.4.1.vsix`. For a development session, open this folder in VS Code and run:
+By default, `vsce package` writes `<name>-<version>.vsix` to the project root. To write this release to `dist/`, run `npx --yes @vscode/vsce package --no-dependencies --no-yarn --out dist/git-baseline-marker-0.4.2.vsix`. For a development session, open this folder in VS Code and run:
 
 ```bash
 code --extensionDevelopmentPath="$(pwd)"

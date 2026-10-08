@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Use HTTPS PNG assets in Marketplace README pages.
+
 ## 0.4.1
 
 - Include Marketplace icon, license, categories, keywords and changelog metadata in offline VSIX packages.
